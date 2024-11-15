@@ -2,6 +2,7 @@ package io.ludovicianul;
 
 import io.ludovicianul.command.IndexSubcommand;
 import io.ludovicianul.log.Logger;
+import io.ludovicianul.model.QueryResult;
 import io.ludovicianul.service.SqlQueryService;
 import io.quarkus.picocli.runtime.annotations.TopCommand;
 import java.io.File;
@@ -13,7 +14,7 @@ import picocli.CommandLine.Command;
     name = "sol",
     description = "Statistics Over git Logs",
     header =
-        "%n@|bold,fg(208) sol - Statistics over git Logs.|@%nGet meaningful insights around code and people behaviour from git activity.%n",
+        "%n@|bold,fg(208) sol - Statistics Over git Logs.|@%nGet meaningful insights around code and people behaviour from git activity.%n",
     mixinStandardHelpOptions = true,
     version = "@|bold,fg(208) sol 0.0.1|@",
     subcommands = {AutoComplete.GenerateCompletion.class})
@@ -39,22 +40,28 @@ public class SolCommand implements Runnable {
   @CommandLine.Option(
       names = {"-D", "--debug"},
       description = "Print debug info")
-  private boolean debug;
+  boolean debug;
 
   @CommandLine.Option(
       names = {"-T", "--timeout"},
       description = "Timeout when executing Git commands")
-  private int timeout = 10;
+  int timeout = 10;
 
   @CommandLine.Option(
       names = {"-i", "--index"},
       description = "Index current git repo")
-  private boolean index;
+  boolean index;
 
   @CommandLine.Option(
       names = {"-u", "--baseUrl"},
       description = "Base url when using Ollama. Default: http://localhost:11434")
   private String baseUrl = "http://localhost:11434";
+
+  @CommandLine.Option(
+      names = {"-o", "--output"},
+      description =
+          "The output type. Default: AI. RAW will print the raw details without interpretation. AI will use the AI service to interpret the results.")
+  ResultType outputType = ResultType.AI;
 
   @CommandLine.Spec CommandLine.Model.CommandSpec spec;
 
@@ -74,7 +81,18 @@ public class SolCommand implements Runnable {
     checkDbIsAvailable();
 
     sqlQueryService = new SqlQueryService(aiService, aiModel, baseUrl);
-    Logger.print(sqlQueryService.askQuestion("The user question is: " + question));
+    QueryResult queryResult = sqlQueryService.askQuestion("The user question is: " + question);
+
+    displayResult(queryResult);
+  }
+
+  private void displayResult(QueryResult queryResult) {
+    if (queryResult.isNoAnswer() || outputType == ResultType.RAW) {
+      Logger.print(queryResult.answers());
+      return;
+    }
+
+    Logger.print(sqlQueryService.analyzeWithAi(queryResult));
   }
 
   private void checkDbIsAvailable() {
@@ -104,5 +122,10 @@ public class SolCommand implements Runnable {
     OPENAI,
     ANTHROPIC,
     OLLAMA
+  }
+
+  public enum ResultType {
+    RAW,
+    AI
   }
 }

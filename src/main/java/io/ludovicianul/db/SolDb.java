@@ -40,6 +40,7 @@ public class SolDb {
                         author TEXT,
                         date TEXT,
                         timezone TEXT,
+                        is_merge INTEGER,
                         total_additions INTEGER DEFAULT 0,
                         total_deletions INTEGER DEFAULT 0,
                         message TEXT
@@ -95,6 +96,7 @@ public class SolDb {
           List.of(
               "CREATE INDEX idx_commits_author ON commits(author);",
               "CREATE INDEX idx_commits_date ON commits(date);",
+              "CREATE INDEX idx_commits_author_date ON commits(author, date);",
               "CREATE INDEX idx_file_changes_file_path ON file_changes(file_path);",
               "CREATE INDEX idx_commit_parents_commit_id ON commit_parents(commit_id);",
               "CREATE INDEX idx_commit_parents_parent_id ON commit_parents(parent_id);");
@@ -175,7 +177,7 @@ public class SolDb {
    */
   public static void insertCommit(CommitRecord commit) {
     String insertCommitSQL =
-        "INSERT INTO commits (commit_id, author, date, timezone, total_additions, total_deletions, message) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO commits (commit_id, author, date, timezone, is_merge, total_additions, total_deletions, message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     String insertFileChangeSQL =
         "INSERT INTO file_changes (commit_hash, author, change_type, file_path, additions, deletions) VALUES (?, ?, ?, ?, ?, ?)";
     String insertIntoCommitParentsSQL =
@@ -207,10 +209,10 @@ public class SolDb {
         commitStmt.setString(2, commit.author());
         commitStmt.setString(3, commit.date());
         commitStmt.setString(4, zone);
-
-        commitStmt.setInt(5, totalAdd);
-        commitStmt.setInt(6, totalDel);
-        commitStmt.setString(7, commit.message());
+        commitStmt.setInt(5, commit.parents().size() > 1 ? 1 : 0);
+        commitStmt.setInt(6, totalAdd);
+        commitStmt.setInt(7, totalDel);
+        commitStmt.setString(8, commit.message());
         commitStmt.executeUpdate();
 
         for (FileChange fileChange : commit.fileChanges()) {

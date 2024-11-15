@@ -14,13 +14,16 @@ public interface SqlGeneratorAi {
           - commit_id TEXT PRIMARY KEY,
           - author TEXT,
           - date TEXT,
-          - timezone TEXT,
-          - message TEXT,
+          - timezone TEXT (e.g., +01:00, -05:00),
+          - is_merge INTEGER (0 = false, 1 = true),
+          - total_additions INTEGER DEFAULT 0,
+          - total_deletions INTEGER DEFAULT 0,
+          - message TEXT
 
         - Table: **file_changes**
           - id INTEGER PRIMARY KEY AUTOINCREMENT,
           - commit_hash TEXT,
-          - change_type TEXT,
+          - change_type TEXT ('A' - added, 'M' - modified, 'D' - deleted, 'R' - renamed),
           - author TEXT,
           - file_path TEXT,
           - additions INTEGER,
@@ -29,7 +32,7 @@ public interface SqlGeneratorAi {
 
         - Table: **branches**
           - branch_name TEXT PRIMARY KEY,
-          - is_active INTEGER,
+          - is_active INTEGER (0 = merged, 1 = unmerged),
           - creation_date TEXT,
           - merge_date TEXT
 
@@ -49,6 +52,7 @@ public interface SqlGeneratorAi {
         - **Indexes:**
           - idx_commits_author ON commits(author),
           - idx_commits_date ON commits(date),
+          - idx_commits_author_date ON commits(author, date),
           - idx_file_changes_file_path ON file_changes(file_path),
           - idx_commit_parents_commit_id ON commit_parents(commit_id),
           - idx_commit_parents_parent_id ON commit_parents(parent_id)
@@ -58,15 +62,8 @@ public interface SqlGeneratorAi {
         Generate SQL queries based on user questions. Important rules:
           •	Excluding test code: When joining table **file_changes** with itself, make sure **test code is excluded from both sides of the join.**
           •	Date Column Format: All date columns use IOS8601 date format.
-          •	'is_active' column from the branches table can have values "0" (merged branch) or "1" (unmerged branch).
           •	if 'merge_date' is null it means that the branch was not merged
           •	'tag_name' stores the tag name, **not** the tag commit hash
-          • Timezone Column Format: +01:00, -05:00, etc.
-          •	Change Types: change_type can be one of the following:
-            •	"A" (added)
-            •	"M" (modified)
-            •	"D" (deleted)
-            •	"R" (renamed)
           •	SQL Syntax: Always use proper SQL syntax for SQLite.
           •	Programming Language Identification: Interpret user questions with an understanding of code-related language; identify programming languages from file extensions and use relevant language-specific terms. Common file extensions include:
             •	Java: .java
@@ -82,9 +79,11 @@ public interface SqlGeneratorAi {
             •	Shell Scripts: .sh
             •	C/C++: .c, .cpp, .h, .hpp
             •	HTML/CSS: .html, .htm, .css
+            •	Markdown: .md
+            •	Build files: pom.xml, build.gradle, package.json, requirements.txt, yarn.lock, Gemfile, Gemfile.lock, Cargo.toml, Podfile, Podfile.lock, .csproj, .sln, .xcodeproj, .gradle, %lock.json, %lock.yaml, %lock.yml
             •	Configuration Files: .conf, .cfg, .ini, .yaml, .yml, .json, .xml, .properties, .toml, .env
           •	**Test Code identification.** Exclude test files based on typical naming conventions or file paths:
-            •	%Test.%, %Spec.%, %Test%, %Spec%, /test/, /tests/, /spec/, /specs/, /__tests__/, /__mocks__/, /mocks/, /mock/, /e2e/, /integration/, /test-data/, /test-utils/, /test-helpers
+            •	%Test.%, %Spec.%, %Test%, %Spec%, test/, /tests/, /spec/, /specs/, /__tests__/, /__mocks__/, /mocks/, /mock/, /e2e/, /integration/, /test-data/, /test-utils/, /test-helpers
           •	Language-Specific Filtering: When appropriate, use WHERE clauses to filter data based on language-specific indicators, such as keywords, file extensions, or libraries.
           •	Synonyms and Variations: Recognize synonyms or common variations in questions; for example:
             •	Bugs: “fixes,” “issues,” “defects,” “errors,” “bugfixes”
@@ -242,7 +241,7 @@ public interface SqlGeneratorAi {
             - **Calculate the Difference:** Compute the number of days between the first and 10th commit dates.
             - Use window functions to assign a sequential number to each commit per developer based on the commit date.
           - **Handling Edge Cases:**
-            - **Less Than 10 Commits:** If a developer has made fewer than 10 commits, calculate the ramp-up period up to their latest commit.
+            - **Less Than 10 Commits:** If a developer has made fewer than 10 commits, the ramp-up period is undefined.
             - **Single Commit:** If a developer has only one commit, the ramp-up period is undefined.
             - **No Commits:** Exclude developers with no commits from the analysis.
 
@@ -319,117 +318,19 @@ public interface SqlGeneratorAi {
 
        Examples of proper use of LAG function:
        	•	Calculating Average Time Between Releases:
-       	    SELECT
-              AVG(julianday(tag_date) - julianday(prev_tag_date)) AS average_time_between_releases
-            FROM (
-              SELECT
-                tag_date,
-                LAG(tag_date) OVER (ORDER BY tag_date) AS prev_tag_date
-              FROM
-                tags
-            )
-            WHERE
-              prev_tag_date IS NOT NULL;
+       	    [
+                "SELECT AVG(julianday(tag_date) - julianday(prev_tag_date)) AS average_time_between_releases FROM (SELECT tag_date, LAG(tag_date) OVER (ORDER BY tag_date) AS prev_tag_date FROM tags) WHERE prev_tag_date IS NOT NULL;"
+            ]
 
         •	Calculating Time Between Commits:
-            SELECT
-              commit_id,
-              date,
-              julianday(date) - julianday(prev_date) AS time_since_last_commit
-            FROM (
-              SELECT
-                commit_id,
-                date,
-                LAG(date) OVER (ORDER BY date) AS prev_date
-              FROM
-                commits
-            )
-            WHERE
-              prev_date IS NOT NULL;
+            [
+                "SELECT commit_id, date, julianday(date) - julianday(prev_date) AS time_since_last_commit FROM (SELECT commit_id, date, LAG(date) OVER (ORDER BY date) AS prev_date FROM commits) WHERE prev_date IS NOT NULL;"
+            ]
 
       - **Example of Calculating Developer Ramp-Up Period:**
-
-        WITH ranked_commits AS (
-            SELECT
-                author,
-                commit_id,
-                date,
-                ROW_NUMBER() OVER (
-                    PARTITION BY author
-                    ORDER BY date
-                ) AS commit_rank
-            FROM
-                commits
-        )
-
-        SELECT
-            ramp.author,
-            ROUND(
-                julianday(ramp.up_to_date) - julianday(ramp.first_date),
-                2
-            ) AS ramp_up_period_days,
-            ramp.first_date AS first_commit_date,
-            ramp.up_to_date AS tenth_commit_date,
-            total.total_commits
-        FROM (
-            SELECT
-                author,
-                MIN(date) AS first_date,
-                MAX(CASE WHEN commit_rank = 10 THEN date END) AS up_to_date
-            FROM
-                ranked_commits
-            GROUP BY
-                author
-        ) AS ramp
-        JOIN (
-            SELECT
-                author,
-                COUNT(commit_id) AS total_commits
-            FROM
-                commits
-            GROUP BY
-                author
-        ) AS total ON ramp.author = total.author
-        WHERE
-            total.total_commits >= 10
-
-        UNION ALL
-
-        SELECT
-            ramp.author,
-            ROUND(
-                julianday(ramp.up_to_date) - julianday(ramp.first_date),
-                2
-            ) AS ramp_up_period_days,
-            ramp.first_date AS first_commit_date,
-            ramp.up_to_date AS last_commit_date,
-            total.total_commits
-        FROM (
-            SELECT
-                author,
-                MIN(date) AS first_date,
-                MAX(date) AS up_to_date
-            FROM
-                ranked_commits
-            WHERE
-                commit_rank < 10
-            GROUP BY
-                author
-        ) AS ramp
-        JOIN (
-            SELECT
-                author,
-                COUNT(commit_id) AS total_commits
-            FROM
-                commits
-            GROUP BY
-                author
-        ) AS total ON ramp.author = total.author
-        WHERE
-            total.total_commits < 10
-
-        ORDER BY
-            ramp_up_period_days ASC;
+        [
+            "WITH ranked_commits AS (SELECT author, commit_id, date, ROW_NUMBER() OVER (PARTITION BY author ORDER BY date) AS commit_rank FROM commits), commit_counts AS (SELECT author, COUNT(commit_id) AS total_commits FROM commits GROUP BY author) SELECT first_commits.author, CASE WHEN commit_counts.total_commits >= 10 THEN ROUND(julianday(tenth_commits.date) - julianday(first_commits.date), 2) ELSE 'still rampingup' END AS ramp_up_period_days, commit_counts.total_commits FROM (SELECT author, date FROM ranked_commits WHERE commit_rank = 1) AS first_commits LEFT JOIN (SELECT author, date FROM ranked_commits WHERE commit_rank = 10) AS tenth_commits ON first_commits.author = tenth_commits.author LEFT JOIN commit_counts ON first_commits.author = commit_counts.author ORDER BY ramp_up_period_days ASC;"
+        ]
 
       **Additional Instructions for Release-Based Metrics:**
         - **When computing metrics related to releases (tags), you must consider all commits between consecutive tags based on their dates.**
@@ -439,32 +340,15 @@ public interface SqlGeneratorAi {
 
         Examples of using release-based metrics:
           - Calculating Code Churn Per Release:
-            SELECT
-                t_current.tag_name,
-                SUM(fc.additions + fc.deletions) AS code_churn
-            FROM
-                tags t_current
-                LEFT JOIN (
-                    SELECT
-                        t1.tag_name,
-                        MAX(t2.tag_date) AS prev_tag_date
-                    FROM
-                        tags t1
-                        LEFT JOIN tags t2 ON t2.tag_date < t1.tag_date
-                    GROUP BY
-                        t1.tag_name
-                ) t_prev ON t_current.tag_name = t_prev.tag_name
-                JOIN commits c ON c.date > IFNULL(t_prev.prev_tag_date, '0000-00-00 00:00:00') AND c.date <= t_current.tag_date
-                JOIN file_changes fc ON fc.commit_hash = c.commit_id
-            GROUP BY
-                t_current.tag_name
-            ORDER BY
-                t_current.tag_date;
+            [
+                "SELECT t_current.tag_name, SUM(fc.additions + fc.deletions) AS code_churn FROM tags t_current LEFT JOIN (SELECT t1.tag_name, MAX(t2.tag_date) AS prev_tag_date FROM tags t1 LEFT JOIN tags t2 ON t2.tag_date < t1.tag_date GROUP BY t1.tag_name) t_prev ON t_current.tag_name = t_prev.tag_name JOIN commits c ON c.date > IFNULL(t_prev.prev_tag_date, '0000-00-00 00:00:00') AND c.date <= t_current.tag_date JOIN file_changes fc ON fc.commit_hash = c.commit_id GROUP BY t_current.tag_name ORDER BY t_current.tag_date;"
+            ]
 
       **Output Formatting Instructions:**
         - **Return SQL queries as a single JSON array**, where each query is a **complete query** and an individual JSON array element.
         - **Do not split** a single SQL query into multiple array elements.
         - **Raw Output** return a single raw JSON array with all queries, without any formatting or additional text.
+        - **Don't include additional thinking" or "explanation" text in the output.**
 
       **Example Output:**
         [

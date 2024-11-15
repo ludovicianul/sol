@@ -10,6 +10,7 @@ import io.ludovicianul.SolCommand;
 import io.ludovicianul.ai.SqlGeneratorAi;
 import io.ludovicianul.db.SolDb;
 import io.ludovicianul.log.Logger;
+import io.ludovicianul.model.QueryResult;
 import io.quarkiverse.langchain4j.ollama.OllamaChatLanguageModel;
 import io.quarkiverse.langchain4j.ollama.Options;
 import java.sql.SQLException;
@@ -65,7 +66,11 @@ public class SqlQueryService {
     this.sqlGenerator = AiServices.create(SqlGeneratorAi.class, aiModel);
   }
 
-  public String askQuestion(String userQuestion) {
+  public String analyzeWithAi(QueryResult result) {
+    return sqlGenerator.beautifyResult(result.piped());
+  }
+
+  public QueryResult askQuestion(String userQuestion) {
     String sql = sqlGenerator.generateSqlQuery(userQuestion);
 
     Logger.debug("Generated SQL query: " + sql + "\n");
@@ -90,14 +95,15 @@ public class SqlQueryService {
     }
 
     if (resultLength == 0) {
-      return "No data could be retrieved for the given question";
+      return QueryResult.empty();
     }
 
-    return sqlGenerator.beautifyResult(sql + "|" + userQuestion + "|" + finalResult);
+    return new QueryResult(sql, finalResult.toString(), userQuestion);
   }
 
   private List<Map<String, Object>> executeQuery(String query) {
     List<Map<String, Object>> queryResult = List.of();
+    long t0 = System.currentTimeMillis();
     try {
       queryResult = SolDb.executeQuery(query);
     } catch (SQLException e) {
@@ -113,6 +119,9 @@ public class SqlQueryService {
       } catch (SQLException e2) {
         Logger.debug("Error while executing revised query: " + e2.getMessage());
       }
+    } finally {
+      long t1 = System.currentTimeMillis();
+      Logger.debug("Query execution time: " + (t1 - t0) + " ms");
     }
     return queryResult;
   }
