@@ -16,7 +16,7 @@ import picocli.CommandLine.Command;
     header =
         "%n@|bold,fg(208) sol - Statistics Over git Logs.|@%nGet meaningful insights around code and people behaviour from git activity.%n",
     mixinStandardHelpOptions = true,
-    version = "@|bold,fg(208) sol 1.0.0|@",
+    version = "@|bold,fg(208) sol 1.0.1|@",
     subcommands = {AutoComplete.GenerateCompletion.class})
 @TopCommand
 public class SolCommand implements Runnable {
