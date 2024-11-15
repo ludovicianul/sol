@@ -80,6 +80,7 @@
     </dependency>
   </dependencies>
   <build>
+    <finalName>sol</finalName>
     <plugins>
       <plugin>
         <groupId>${quarkus.platform.group-id}</groupId>
