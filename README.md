@@ -52,7 +52,11 @@ Sol is a command line application that allows you to chat with your git history.
 
 # Installation
 
-//ADD INSTALLATION INSTRUCTIONS
+```bash
+brew install ludovicianul/tap/sol
+```
+
+There are binaries available for Linux and macOS as well as cross-platform `uberjar`. You can download them from the [releases page](https://github.com/ludovicianul/sol/releases)
 
 # How to use sol?
 
