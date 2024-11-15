@@ -151,4 +151,9 @@
       </properties>
     </profile>
   </profiles>
+  <scm>
+    <url>https://ludovicianul@github.com/ludovicianul/sol.git</url>
+    <connection>scm:git:git@github.com:ludovicianul/sol.git</connection>
+    <developerConnection>scm:git:git@github.com:ludovicianul/sol.git</developerConnection>
+  </scm>
 </project>
