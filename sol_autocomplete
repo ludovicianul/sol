@@ -173,8 +173,9 @@ function _picocli_sol() {
 
   local commands="generate-completion"
   local flag_opts="-D --debug -i --index -h --help -V --version"
-  local arg_opts="-q --question -s --ai -m --model -T --timeout -u --baseUrl"
+  local arg_opts="-q --question -s --ai -m --model -T --timeout -u --baseUrl -o --output"
   local aiService_option_args=("OPENAI" "ANTHROPIC" "OLLAMA") # --ai values
+  local outputType_option_args=("RAW" "AI") # --output values
 
   type compopt &>/dev/null && compopt +o default
 
@@ -195,6 +196,11 @@ function _picocli_sol() {
       ;;
     -u|--baseUrl)
       return
+      ;;
+    -o|--output)
+      local IFS=$'\n'
+      COMPREPLY=( $( compReplyArray "${outputType_option_args[@]}" ) )
+      return $?
       ;;
   esac
 
