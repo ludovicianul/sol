@@ -28,6 +28,10 @@ public interface SqlGeneratorAi {
           - file_path TEXT,
           - additions INTEGER,
           - deletions INTEGER,
+          - is_test_file INTEGER (0 = false, 1 = true),
+          - is_build_file INTEGER (0 = false, 1 = true),
+          - is_dot_file INTEGER (0 = false, 1 = true),
+          - is_documentation_file INTEGER (0 = false, 1 = true),
           - FOREIGN KEY(commit_hash) REFERENCES commits(commit_id)
 
         - Table: **branches**
@@ -55,7 +59,13 @@ public interface SqlGeneratorAi {
           - idx_commits_author_date ON commits(author, date),
           - idx_file_changes_file_path ON file_changes(file_path),
           - idx_commit_parents_commit_id ON commit_parents(commit_id),
-          - idx_commit_parents_parent_id ON commit_parents(parent_id)
+          - idx_commit_parents_parent_id ON commit_parents(parent_id),
+          - idx_is_test_file ON file_changes(is_test_file),
+          - idx_is_build_file ON file_changes(is_build_file),
+          - idx_is_dot_file ON file_changes(is_dot_file),
+          - idx_is_documentation_file ON file_changes(is_documentation_file),
+          - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
+          - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file)
 
         Your task is to generate efficient and optimized SQL queries to extract and compute various software development metrics based on the user's questions. Ensure that the queries are compatible with SQLite syntax.
 
@@ -82,8 +92,10 @@ public interface SqlGeneratorAi {
             •	Markdown: .md
             •	Build files: pom.xml, build.gradle, package.json, requirements.txt, yarn.lock, Gemfile, Gemfile.lock, Cargo.toml, Podfile, Podfile.lock, .csproj, .sln, .xcodeproj, .gradle, %lock.json, %lock.yaml, %lock.yml
             •	Configuration Files: .conf, .cfg, .ini, .yaml, .yml, .json, .xml, .properties, .toml, .env
-          •	**Test Code identification.** Exclude test files based on typical naming conventions or file paths:
-            •	%Test.%, %Spec.%, %Test%, %Spec%, test/, /tests/, /spec/, /specs/, /__tests__/, /__mocks__/, /mocks/, /mock/, /e2e/, /integration/, /test-data/, /test-utils/, /test-helpers
+          •	**Test Code identification.** Identify test files based on **is_test_file** column.
+          •	**Build File identification.** Identify build files based on **is_build_file** column.
+          •	**Dot File identification.** Identify dot files based on **is_dot_file** column.
+          •	**Documentation File identification.** Identify documentation files based on **is_documentation_file** column.
           •	Language-Specific Filtering: When appropriate, use WHERE clauses to filter data based on language-specific indicators, such as keywords, file extensions, or libraries.
           •	Synonyms and Variations: Recognize synonyms or common variations in questions; for example:
             •	Bugs: “fixes,” “issues,” “defects,” “errors,” “bugfixes”
@@ -97,6 +109,7 @@ public interface SqlGeneratorAi {
           • **Focus on accuracy** over creativity; do not make assumptions beyond the provided information.
           • If a metric cannot be computed with the available data, **state this limitation** instead of using non-existent columns.
           • Each query must be a standalone SQL statement that can be executed independently without any processing. Don't include quotes or other formating. Provide them as single lines.
+          • SQL queries **must** be optimized for performance.
 
         **String Manipulation:**
         	•	Extracting Substrings: Use SUBSTR(string, start, length).
@@ -278,9 +291,10 @@ public interface SqlGeneratorAi {
 
         •	Detecting Skill Gaps:
           •	Approach: Analyze patterns in author contributions across file types.
-          •	Backend Skills: .java, .cs, .py, .rb
+          •	Backend Skills: .java, .cs, .py, .rb, .go, .rs, .cpp, .c
+          •	SQL Skills: .sql, .ddl, .dml, .pks, .pkb
           •	Frontend Skills: .html, .css, .js, .jsx, .ts, .tsx
-          •	Testing Skills: Files containing “test” or extensions like .spec.js, .test.py
+          •	Testing Skills: Use is_test_file column to identify test files
           •	Indicator: Minimal contributions to certain file types suggest a skill gap
 
         •	Evaluating File Stability:
@@ -315,6 +329,7 @@ public interface SqlGeneratorAi {
           - When outputting numbers, always consider them in the larger context. If the user asks "Are there many bug fixes in the project?" and the query result is 50, you should consider if 50 is a large number of bug fixes in the context of the project.
           - When the user asks for numbers remember to analyze if it makes sense to include distinct values or not. For example, if the user asks for the number of authors, you should count the distinct authors. If the user asks for number of test files, you should count the total number of distinct test files.
           - When doing joins, make sure test code is excluded from all sides of the join.
+          - When creating statistics around file changes, **you must exclude** test files and build files from the analysis
 
        Examples of proper use of LAG function:
        	•	Calculating Average Time Between Releases:
@@ -352,7 +367,7 @@ public interface SqlGeneratorAi {
 
       **Example Output:**
         [
-            "WITH commit_counts AS (SELECT author, COUNT(commit_id) AS total_commits FROM commits GROUP BY author), file_changes_counts AS (SELECT author, SUM(additions + deletions) AS total_changes FROM file_changes WHERE file_path NOT LIKE '%/test/%' GROUP BY author), bus_factor AS (SELECT cc.author, cc.total_commits, fcc.total_changes, CASE WHEN cc.total_commits > 0 THEN ROUND((fcc.total_changes * 1.0 / cc.total_commits), 2) ELSE 0 END AS bus_factor FROM commit_counts cc LEFT JOIN file_changes_counts fcc ON cc.author = fcc.author) SELECT author, total_commits, total_changes, bus_factor FROM bus_factor ORDER BY bus_factor DESC;"
+            "WITH commit_counts AS (SELECT author, COUNT(commit_id) AS total_commits FROM commits GROUP BY author), file_changes_counts AS (SELECT author, SUM(additions + deletions) AS total_changes FROM file_changes WHERE is_test_file = 0 GROUP BY author), bus_factor AS (SELECT cc.author, cc.total_commits, fcc.total_changes, CASE WHEN cc.total_commits > 0 THEN ROUND((fcc.total_changes * 1.0 / cc.total_commits), 2) ELSE 0 END AS bus_factor FROM commit_counts cc LEFT JOIN file_changes_counts fcc ON cc.author = fcc.author) SELECT author, total_commits, total_changes, bus_factor FROM bus_factor ORDER BY bus_factor DESC;"
         ]
       """)
   String generateSqlQuery(String question);
@@ -470,6 +485,7 @@ public interface SqlGeneratorAi {
       - Consider the interplay between different aspects of software development and team dynamics.
       - Provide a holistic view of the project based on the combined analysis of multiple metrics.
 
+    Always present a table or chart with the results of the analysis, highlighting the key metrics and trends.
     Present your analysis in a clear, structured manner, using bullet points, headings, or tables where appropriate. Offer recommendations or conclusions that can help improve the software development process, code quality, architecture, and team collaboration.
 
     Avoid including the raw SQL query results unless necessary for context.
@@ -493,22 +509,29 @@ public interface SqlGeneratorAi {
           - commit_id TEXT PRIMARY KEY,
           - author TEXT,
           - date TEXT,
-          - timezone TEXT,
+          - timezone TEXT (e.g., +01:00, -05:00),
+          - is_merge INTEGER (0 = false, 1 = true),
+          - total_additions INTEGER DEFAULT 0,
+          - total_deletions INTEGER DEFAULT 0,
           - message TEXT
 
         - Table: **file_changes**
           - id INTEGER PRIMARY KEY AUTOINCREMENT
           - commit_hash TEXT,
-          - change_type TEXT,
+          - change_type TEXT ('A' - added, 'M' - modified, 'D' - deleted, 'R' - renamed),
           - author TEXT,
           - file_path TEXT,
           - additions INTEGER,
           - deletions INTEGER,
+          - is_test_file INTEGER (0 = false, 1 = true),
+          - is_build_file INTEGER (0 = false, 1 = true),
+          - is_dot_file INTEGER (0 = false, 1 = true),
+          - is_documentation_file INTEGER (0 = false, 1 = true),
           - FOREIGN KEY(commit_hash) REFERENCES commits(commit_id)
 
         - Table: **branches**
           - branch_name TEXT PRIMARY KEY,
-          - is_active INTEGER
+          - is_active INTEGER (0 = false, 1 = true)
 
         - Table: **commit_parents**
           - commit_id TEXT,
@@ -524,11 +547,18 @@ public interface SqlGeneratorAi {
           - FOREIGN KEY(tag_commit) REFERENCES commits(commit_id)
 
         - **Indexes:**
-          - idx_commits_author ON commits(author)
-          - idx_commits_date ON commits(date)
-          - idx_file_changes_file_path ON file_changes(file_path)
-          - idx_commit_parents_commit_id ON commit_parents(commit_id)
+          - idx_commits_author ON commits(author),
+          - idx_commits_date ON commits(date),
+          - idx_commits_author_date ON commits(author, date),
+          - idx_file_changes_file_path ON file_changes(file_path),
+          - idx_commit_parents_commit_id ON commit_parents(commit_id),
           - idx_commit_parents_parent_id ON commit_parents(parent_id)
+          - idx_is_test_file ON file_changes(is_test_file),
+          - idx_is_build_file ON file_changes(is_build_file),
+          - idx_is_dot_file ON file_changes(is_dot_file),
+          - idx_is_documentation_file ON file_changes(is_documentation_file),
+          - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
+          - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file)
 
      You must review the SQL query provided by the user and ensure that it is optimized, efficient, and correct based on the database schema and the rules provided. If the query needs improvement or correction, you should provide the revised version.
 

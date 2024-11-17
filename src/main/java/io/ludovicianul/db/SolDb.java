@@ -57,6 +57,10 @@ public class SolDb {
                         file_path TEXT,
                         additions INTEGER,
                         deletions INTEGER,
+                        is_test_file INTEGER,
+                        is_build_file INTEGER,
+                        is_dot_file INTEGER,
+                        is_documentation_file INTEGER,
                         FOREIGN KEY(commit_hash) REFERENCES commits(commit_id)
                     );
                     """;
@@ -98,6 +102,14 @@ public class SolDb {
               "CREATE INDEX idx_commits_date ON commits(date);",
               "CREATE INDEX idx_commits_author_date ON commits(author, date);",
               "CREATE INDEX idx_file_changes_file_path ON file_changes(file_path);",
+              "CREATE INDEX idx_file_changes_commit_file ON file_changes(commit_hash, file_path);",
+              "CREATE INDEX idx_file_changes_group_order ON file_changes(file_path, commit_hash);",
+              "CREATE INDEX idx_file_changes_commit_hash ON file_changes(commit_hash);",
+              "CREATE INDEX idx_is_test_file ON file_changes(is_test_file);",
+              "CREATE INDEX idx_is_build_file ON file_changes(is_build_file);",
+              "CREATE INDEX idx_is_dot_file ON file_changes(is_dot_file);",
+              "CREATE INDEX idx_is_documentation_file ON file_changes(is_documentation_file);",
+              "CREATE INDEX idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file);",
               "CREATE INDEX idx_commit_parents_commit_id ON commit_parents(commit_id);",
               "CREATE INDEX idx_commit_parents_parent_id ON commit_parents(parent_id);");
 
@@ -173,70 +185,79 @@ public class SolDb {
   /**
    * Inserts a commit record into the database.
    *
-   * @param commit the commit record to insert
+   * @param commits the list of commit records to insert
    */
-  public static void insertCommit(CommitRecord commit) {
+  public static void insertCommits(List<CommitRecord> commits) {
     String insertCommitSQL =
         "INSERT INTO commits (commit_id, author, date, timezone, is_merge, total_additions, total_deletions, message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
     String insertFileChangeSQL =
-        "INSERT INTO file_changes (commit_hash, author, change_type, file_path, additions, deletions) VALUES (?, ?, ?, ?, ?, ?)";
+        "INSERT INTO file_changes (commit_hash, author, change_type, file_path, additions, deletions, is_test_file, is_build_file, is_dot_file, is_documentation_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     String insertIntoCommitParentsSQL =
         "INSERT INTO commit_parents (commit_id, parent_id) VALUES (?, ?)";
 
     try (Connection conn = DriverManager.getConnection(DB_URL)) {
       conn.setAutoCommit(false);
+      for (CommitRecord commit : commits) {
 
-      try (PreparedStatement commitStmt = conn.prepareStatement(insertCommitSQL);
-          PreparedStatement fileChangeStmt = conn.prepareStatement(insertFileChangeSQL);
-          PreparedStatement parentStmt = conn.prepareStatement(insertIntoCommitParentsSQL)) {
-        int totalAdd =
-            commit.fileChanges().stream()
-                .filter(f -> f.changeType().equals("A"))
-                .mapToInt(FileChange::additions)
-                .sum();
-        int totalDel =
-            commit.fileChanges().stream()
-                .filter(f -> f.changeType().equals("D"))
-                .mapToInt(FileChange::deletions)
-                .sum();
+        try (PreparedStatement commitStmt = conn.prepareStatement(insertCommitSQL);
+            PreparedStatement fileChangeStmt = conn.prepareStatement(insertFileChangeSQL);
+            PreparedStatement parentStmt = conn.prepareStatement(insertIntoCommitParentsSQL)) {
+          int totalAdd =
+              commit.fileChanges().stream()
+                  .filter(f -> f.changeType().equals("A"))
+                  .mapToInt(FileChange::additions)
+                  .sum();
+          int totalDel =
+              commit.fileChanges().stream()
+                  .filter(f -> f.changeType().equals("D"))
+                  .mapToInt(FileChange::deletions)
+                  .sum();
 
-        String zone =
-            OffsetDateTime.parse(commit.date())
-                .getOffset()
-                .getDisplayName(TextStyle.SHORT, Locale.getDefault());
+          String zone =
+              OffsetDateTime.parse(commit.date())
+                  .getOffset()
+                  .getDisplayName(TextStyle.SHORT, Locale.getDefault());
 
-        commitStmt.setString(1, commit.commitHash());
-        commitStmt.setString(2, commit.author());
-        commitStmt.setString(3, commit.date());
-        commitStmt.setString(4, zone);
-        commitStmt.setInt(5, commit.parents().size() > 1 ? 1 : 0);
-        commitStmt.setInt(6, totalAdd);
-        commitStmt.setInt(7, totalDel);
-        commitStmt.setString(8, commit.message());
-        commitStmt.executeUpdate();
+          commitStmt.setString(1, commit.commitHash());
+          commitStmt.setString(2, commit.author());
+          commitStmt.setString(3, commit.date());
+          commitStmt.setString(4, zone);
+          commitStmt.setInt(5, commit.parents().size() > 1 ? 1 : 0);
+          commitStmt.setInt(6, totalAdd);
+          commitStmt.setInt(7, totalDel);
+          commitStmt.setString(8, commit.message());
+          commitStmt.addBatch();
 
-        for (FileChange fileChange : commit.fileChanges()) {
-          fileChangeStmt.setString(1, commit.commitHash());
-          fileChangeStmt.setString(2, commit.author());
-          fileChangeStmt.setString(3, fileChange.changeType());
-          fileChangeStmt.setString(4, fileChange.filePath());
-          fileChangeStmt.setInt(5, fileChange.additions());
-          fileChangeStmt.setInt(6, fileChange.deletions());
-          fileChangeStmt.addBatch();
+          for (FileChange fileChange : commit.fileChanges()) {
+            fileChangeStmt.setString(1, commit.commitHash());
+            fileChangeStmt.setString(2, commit.author());
+            fileChangeStmt.setString(3, fileChange.changeType());
+            fileChangeStmt.setString(4, fileChange.filePath());
+            fileChangeStmt.setInt(5, fileChange.additions());
+            fileChangeStmt.setInt(6, fileChange.deletions());
+            fileChangeStmt.setInt(7, fileChange.isTestFile() ? 1 : 0);
+            fileChangeStmt.setInt(8, fileChange.isBuildFile() ? 1 : 0);
+            fileChangeStmt.setInt(9, fileChange.isDotFile() ? 1 : 0);
+            fileChangeStmt.setInt(10, fileChange.isDocumentationFile() ? 1 : 0);
+
+            fileChangeStmt.addBatch();
+          }
+
+          for (String parent : commit.parents()) {
+            parentStmt.setString(1, commit.commitHash());
+            parentStmt.setString(2, parent);
+            parentStmt.addBatch();
+          }
+
+          commitStmt.executeBatch();
+          fileChangeStmt.executeBatch();
+          parentStmt.executeBatch();
+
+          conn.commit();
+        } catch (SQLException e) {
+          conn.rollback();
+          System.err.println("There was an issue inserting commits: " + e.getMessage());
         }
-        fileChangeStmt.executeBatch();
-
-        for (String parent : commit.parents()) {
-          parentStmt.setString(1, commit.commitHash());
-          parentStmt.setString(2, parent);
-          parentStmt.addBatch();
-        }
-        parentStmt.executeBatch();
-
-        conn.commit();
-      } catch (SQLException e) {
-        conn.rollback();
-        System.err.println("There was an issue inserting commits: " + e.getMessage());
       }
     } catch (SQLException e) {
       System.err.println("There was an issue connecting to commits.db: " + e.getMessage());

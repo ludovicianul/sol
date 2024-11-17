@@ -7,6 +7,7 @@ import io.ludovicianul.model.Branch;
 import io.ludovicianul.model.CommitRecord;
 import io.ludovicianul.model.FileChange;
 import io.ludovicianul.model.Tag;
+import io.ludovicianul.service.FileTypeService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -22,9 +23,11 @@ public class IndexSubcommand implements Runnable {
 
   private final int timeout;
   private String mainBranch;
+  private final FileTypeService fileTypeService;
 
   public IndexSubcommand(int timeout) {
     this.timeout = timeout;
+    fileTypeService = new FileTypeService();
   }
 
   @Override
@@ -129,11 +132,11 @@ public class IndexSubcommand implements Runnable {
 
     List<CommitRecord> commits = parseCommits(gitLog);
 
-    commits.forEach(SolDb::insertCommit);
+    SolDb.insertCommits(commits);
     Logger.print("Commits indexed successfully");
   }
 
-  public static List<CommitRecord> parseCommits(List<String> lines) {
+  public List<CommitRecord> parseCommits(List<String> lines) {
     List<CommitRecord> commits = new ArrayList<>();
     String commitHash = null;
     String author = null;
@@ -173,7 +176,16 @@ public class IndexSubcommand implements Runnable {
         String[] parts = line.split("\\s+");
         String changeType = parts[4];
         String filePath = parts[5];
-        fileChanges.add(new FileChange(changeType, filePath, 0, 0));
+        fileChanges.add(
+            new FileChange(
+                changeType,
+                filePath,
+                0,
+                0,
+                fileTypeService.isTestFile(filePath),
+                fileTypeService.isBuildFile(filePath),
+                fileTypeService.isDotFile(filePath),
+                fileTypeService.isDocumentationFile(filePath)));
       } else if (line.matches("\\d+\\s+\\d+\\s+.*")) {
         String[] parts = line.split("\\s+");
         int additions = Integer.parseInt(parts[0]);
@@ -184,7 +196,15 @@ public class IndexSubcommand implements Runnable {
           if (fileChange.filePath().equals(filePath)) {
             fileChanges.set(
                 fileChanges.indexOf(fileChange),
-                new FileChange(fileChange.changeType(), filePath, additions, deletions));
+                new FileChange(
+                    fileChange.changeType(),
+                    filePath,
+                    additions,
+                    deletions,
+                    fileChange.isTestFile(),
+                    fileChange.isBuildFile(),
+                    fileChange.isDotFile(),
+                    fileChange.isDocumentationFile()));
             break;
           }
         }
