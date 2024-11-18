@@ -11,6 +11,7 @@ import io.ludovicianul.service.FileTypeService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -23,6 +24,9 @@ public class IndexSubcommand implements Runnable {
 
   private final int timeout;
   private String mainBranch;
+  private List<CommitRecord> commits;
+  private Map<String, String> branchAndCreationDates;
+
   private final FileTypeService fileTypeService;
 
   public IndexSubcommand(int timeout) {
@@ -52,8 +56,28 @@ public class IndexSubcommand implements Runnable {
   }
 
   private void parseBranches() {
+    branchAndCreationDates = getBranchAndCreationDates();
     parseBranches("merged");
     parseBranches("no-merged");
+  }
+
+  private Map<String, String> getBranchAndCreationDates() {
+    Logger.print("Getting branch creation dates...");
+    return ProcessRunner.INSTANCE
+        .getMultiLineProcessOut(
+            timeout,
+            "git for-each-ref --format='%(refname:short),%(creatordate:iso-strict)' refs/heads/ refs/remotes/")
+        .stream()
+        .map(String::trim)
+        .map(branch -> branch.replace("origin/", ""))
+        .distinct()
+        .map(branch -> branch.split(","))
+        .filter(branch -> branch.length == 2)
+        .collect(
+            Collectors.toMap(
+                branch -> branch[0].trim(),
+                branch -> branch[1].trim(),
+                (existing, replacement) -> existing));
   }
 
   private void parseTags() {
@@ -62,7 +86,7 @@ public class IndexSubcommand implements Runnable {
     List<String> tags =
         ProcessRunner.INSTANCE.getMultiLineProcessOut(
             timeout,
-            "git for-each-ref --format='%(refname:short),%(objectname),%(creatordate:iso-strict),%(contents)' refs/tags");
+            "git for-each-ref --format='%(refname:short),%(object),%(creatordate:iso-strict),%(contents)' refs/tags");
 
     tags.stream()
         .map(tag -> tag.split(","))
@@ -84,13 +108,14 @@ public class IndexSubcommand implements Runnable {
             .map(String::trim)
             .filter(branch -> !branch.toLowerCase().endsWith("main"))
             .filter(branch -> !branch.toLowerCase().endsWith("master"))
+            .map(branch -> branch.replace("remotes/", "").replace("origin/", ""))
             .collect(Collectors.toSet());
 
     mergedBranches.stream()
         .map(
             branch -> {
-              String creationDate = getCreationDate(branch);
-              String mergeDate = getMergeDate(branch);
+              String creationDate = branchAndCreationDates.get(branch);
+              String mergeDate = "merged".equals(merged) ? getMergeDate(branch) : null;
               int active = "merged".equals(merged) ? 0 : 1;
 
               return new Branch(branch, active, creationDate, mergeDate);
@@ -101,25 +126,11 @@ public class IndexSubcommand implements Runnable {
   }
 
   private String getMergeDate(String branch) {
-    String toSearch = branch.replace("remotes/", "").replace("origin/", "");
-
-    return ProcessRunner.INSTANCE
-        .getMultiLineProcessOut(
-            timeout, "git log --merges --format=\"%cI %s\" --grep \"" + toSearch + "\"")
-        .stream()
-        .map(date -> date.split(" ")[0])
-        .map(String::trim)
+    return commits.stream()
+        .filter(commit -> commit.message().contains(branch))
         .findFirst()
+        .map(CommitRecord::date)
         .orElse(null);
-  }
-
-  private String getCreationDate(String branch) {
-    String branchToGrep = branch.replace("remotes/", "").replace("origin/", "");
-    String commandToRun =
-        "{ git log --all --grep='%s' --pretty=format:%%cI --reverse | head -n1; git show -s --format=%%cI $(git merge-base %s %s); } | sort | head -n1"
-            .formatted(branchToGrep, mainBranch, branch);
-
-    return ProcessRunner.INSTANCE.getSingleLineProcessOut(timeout, commandToRun);
   }
 
   private void parseCommits() {
@@ -128,9 +139,9 @@ public class IndexSubcommand implements Runnable {
     List<String> gitLog =
         ProcessRunner.INSTANCE.getMultiLineProcessOut(
             timeout,
-            "git log --encoding=UTF-8 --numstat --raw --format=\"commit:%H%nauthor:%an%ndate:%cI %nparents:%P%nmessage:%n%s%n%b%nnumstat:\"");
+            "git log --all --encoding=UTF-8 --numstat --raw --format=\"commit:%H%nauthor:%an%ndate:%cI %nparents:%P%nmessage:%n%s%n%b%nnumstat:\"");
 
-    List<CommitRecord> commits = parseCommits(gitLog);
+    commits = parseCommits(gitLog);
 
     SolDb.insertCommits(commits);
     Logger.print("Commits indexed successfully");

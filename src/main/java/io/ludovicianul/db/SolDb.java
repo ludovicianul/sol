@@ -20,6 +20,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 /** Interacts with the sqlite db. */
 @Singleton
@@ -43,6 +45,12 @@ public class SolDb {
                         is_merge INTEGER,
                         total_additions INTEGER DEFAULT 0,
                         total_deletions INTEGER DEFAULT 0,
+                        total_additions_test INTEGER DEFAULT 0,
+                        total_deletions_test INTEGER DEFAULT 0,
+                        total_additions_dot INTEGER DEFAULT 0,
+                        total_deletions_dot INTEGER DEFAULT 0,
+                        total_additions_build INTEGER DEFAULT 0,
+                        total_deletions_build INTEGER DEFAULT 0,
                         message TEXT
                     );
                     """;
@@ -89,7 +97,6 @@ public class SolDb {
           """
                         CREATE TABLE IF NOT EXISTS tags (
                             tag_name TEXT PRIMARY KEY,
-                            tag_date TEXT,
                             tag_commit TEXT,
                             tag_message TEXT,
                             FOREIGN KEY(tag_commit) REFERENCES commits(commit_id)
@@ -101,6 +108,9 @@ public class SolDb {
               "CREATE INDEX idx_commits_author ON commits(author);",
               "CREATE INDEX idx_commits_date ON commits(date);",
               "CREATE INDEX idx_commits_author_date ON commits(author, date);",
+              "CREATE INDEX idx_commit_date_merge on commits(date, is_merge);",
+              "CREATE INDEX idx_commit_merge_date on commits(is_merge, date);",
+              "CREATE INDEX idx_commit_date_id on commits(date, commit_id);",
               "CREATE INDEX idx_file_changes_file_path ON file_changes(file_path);",
               "CREATE INDEX idx_file_changes_commit_file ON file_changes(commit_hash, file_path);",
               "CREATE INDEX idx_file_changes_group_order ON file_changes(file_path, commit_hash);",
@@ -108,8 +118,10 @@ public class SolDb {
               "CREATE INDEX idx_is_test_file ON file_changes(is_test_file);",
               "CREATE INDEX idx_is_build_file ON file_changes(is_build_file);",
               "CREATE INDEX idx_is_dot_file ON file_changes(is_dot_file);",
+              "CREATE INDEX idx_tag_name on tags(tag_name);",
               "CREATE INDEX idx_is_documentation_file ON file_changes(is_documentation_file);",
               "CREATE INDEX idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file);",
+              "CREATE INDEX idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions);",
               "CREATE INDEX idx_commit_parents_commit_id ON commit_parents(commit_id);",
               "CREATE INDEX idx_commit_parents_parent_id ON commit_parents(parent_id);");
 
@@ -149,16 +161,14 @@ public class SolDb {
   }
 
   public static void insertTag(Tag tag) {
-    String insertTagSQL =
-        "INSERT INTO tags (tag_name, tag_date, tag_commit, tag_message) VALUES (?, ?, ?, ?)";
+    String insertTagSQL = "INSERT INTO tags (tag_name, tag_commit, tag_message) VALUES (?, ?, ?)";
 
     try (Connection conn = DriverManager.getConnection(DB_URL);
         PreparedStatement tagStmt = conn.prepareStatement(insertTagSQL)) {
 
       tagStmt.setString(1, tag.name());
-      tagStmt.setString(2, tag.date());
-      tagStmt.setString(3, tag.commitId());
-      tagStmt.setString(4, tag.message());
+      tagStmt.setString(2, tag.commitId());
+      tagStmt.setString(3, tag.message());
       tagStmt.executeUpdate();
     } catch (SQLException e) {
       System.err.println("There was an issue inserting tags: " + e.getMessage());
@@ -189,29 +199,39 @@ public class SolDb {
    */
   public static void insertCommits(List<CommitRecord> commits) {
     String insertCommitSQL =
-        "INSERT INTO commits (commit_id, author, date, timezone, is_merge, total_additions, total_deletions, message) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO commits (commit_id, author, date, timezone, is_merge, total_additions, "
+            + "total_deletions, message, total_additions_test, total_deletions_test, "
+            + "total_additions_build, total_deletions_build, "
+            + "total_additions_dot, total_deletions_dot) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     String insertFileChangeSQL =
         "INSERT INTO file_changes (commit_hash, author, change_type, file_path, additions, deletions, is_test_file, is_build_file, is_dot_file, is_documentation_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     String insertIntoCommitParentsSQL =
         "INSERT INTO commit_parents (commit_id, parent_id) VALUES (?, ?)";
 
+    final int BATCH_SIZE = 1000;
+    int batchCount = 0;
+
     try (Connection conn = DriverManager.getConnection(DB_URL)) {
       conn.setAutoCommit(false);
-      for (CommitRecord commit : commits) {
 
-        try (PreparedStatement commitStmt = conn.prepareStatement(insertCommitSQL);
-            PreparedStatement fileChangeStmt = conn.prepareStatement(insertFileChangeSQL);
-            PreparedStatement parentStmt = conn.prepareStatement(insertIntoCommitParentsSQL)) {
-          int totalAdd =
-              commit.fileChanges().stream()
-                  .filter(f -> f.changeType().equals("A"))
-                  .mapToInt(FileChange::additions)
-                  .sum();
-          int totalDel =
-              commit.fileChanges().stream()
-                  .filter(f -> f.changeType().equals("D"))
-                  .mapToInt(FileChange::deletions)
-                  .sum();
+      try (PreparedStatement commitStmt = conn.prepareStatement(insertCommitSQL);
+          PreparedStatement fileChangeStmt = conn.prepareStatement(insertFileChangeSQL);
+          PreparedStatement parentStmt = conn.prepareStatement(insertIntoCommitParentsSQL)) {
+
+        for (CommitRecord commit : commits) {
+          // Prepare commit batch
+          int totalAdd = count(commit, "A", x -> true, FileChange::additions);
+          int totalDel = count(commit, "D", x -> true, FileChange::deletions);
+
+          int totalDelTestFiles = count(commit, "D", FileChange::isTestFile, FileChange::deletions);
+          int totalAddTestFiles = count(commit, "A", FileChange::isTestFile, FileChange::additions);
+          int totalDelDotFiles = count(commit, "D", FileChange::isDotFile, FileChange::deletions);
+          int totalAddDotFiles = count(commit, "A", FileChange::isDotFile, FileChange::additions);
+          int totalDelBuildFiles =
+              count(commit, "D", FileChange::isBuildFile, FileChange::deletions);
+          int totalAddBuildFiles =
+              count(commit, "A", FileChange::isBuildFile, FileChange::additions);
 
           String zone =
               OffsetDateTime.parse(commit.date())
@@ -226,8 +246,16 @@ public class SolDb {
           commitStmt.setInt(6, totalAdd);
           commitStmt.setInt(7, totalDel);
           commitStmt.setString(8, commit.message());
+          commitStmt.setInt(9, totalAddTestFiles);
+          commitStmt.setInt(10, totalDelTestFiles);
+          commitStmt.setInt(11, totalAddDotFiles);
+          commitStmt.setInt(12, totalDelDotFiles);
+          commitStmt.setInt(13, totalAddBuildFiles);
+          commitStmt.setInt(14, totalDelBuildFiles);
+
           commitStmt.addBatch();
 
+          // Prepare file changes batch
           for (FileChange fileChange : commit.fileChanges()) {
             fileChangeStmt.setString(1, commit.commitHash());
             fileChangeStmt.setString(2, commit.author());
@@ -239,29 +267,52 @@ public class SolDb {
             fileChangeStmt.setInt(8, fileChange.isBuildFile() ? 1 : 0);
             fileChangeStmt.setInt(9, fileChange.isDotFile() ? 1 : 0);
             fileChangeStmt.setInt(10, fileChange.isDocumentationFile() ? 1 : 0);
-
             fileChangeStmt.addBatch();
           }
 
+          // Prepare commit parents batch
           for (String parent : commit.parents()) {
             parentStmt.setString(1, commit.commitHash());
             parentStmt.setString(2, parent);
             parentStmt.addBatch();
           }
 
-          commitStmt.executeBatch();
-          fileChangeStmt.executeBatch();
-          parentStmt.executeBatch();
+          batchCount++;
 
-          conn.commit();
-        } catch (SQLException e) {
-          conn.rollback();
-          System.err.println("There was an issue inserting commits: " + e.getMessage());
+          // Execute and commit every BATCH_SIZE records
+          if (batchCount % BATCH_SIZE == 0) {
+            commitStmt.executeBatch();
+            fileChangeStmt.executeBatch();
+            parentStmt.executeBatch();
+            conn.commit();
+          }
         }
+
+        // Execute batches
+        commitStmt.executeBatch();
+        fileChangeStmt.executeBatch();
+        parentStmt.executeBatch();
+
+        conn.commit();
+      } catch (SQLException e) {
+        conn.rollback();
+        System.err.println("There was an issue inserting commits: " + e.getMessage());
       }
     } catch (SQLException e) {
       System.err.println("There was an issue connecting to commits.db: " + e.getMessage());
     }
+  }
+
+  private static int count(
+      CommitRecord commit,
+      String type,
+      Predicate<FileChange> predicate,
+      ToIntFunction<FileChange> sumFunction) {
+    return commit.fileChanges().stream()
+        .filter(f -> f.changeType().equals(type))
+        .filter(predicate)
+        .mapToInt(sumFunction)
+        .sum();
   }
 
   /**

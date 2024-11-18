@@ -16,8 +16,14 @@ public interface SqlGeneratorAi {
           - date TEXT,
           - timezone TEXT (e.g., +01:00, -05:00),
           - is_merge INTEGER (0 = false, 1 = true),
-          - total_additions INTEGER DEFAULT 0,
-          - total_deletions INTEGER DEFAULT 0,
+          - total_additions INTEGER,
+          - total_deletions INTEGER,
+          - total_additions_test INTEGER,
+          - total_deletions_test INTEGER,
+          - total_additions_dot INTEGER,
+          - total_deletions_dot INTEGER,
+          - total_additions_build INTEGER,
+          - total_deletions_build INTEGER,
           - message TEXT
 
         - Table: **file_changes**
@@ -48,29 +54,34 @@ public interface SqlGeneratorAi {
 
        - Table: **tags**
           - tag_name TEXT PRIMARY KEY,
-          - tag_date TEXT,
           - tag_commit TEXT,
           - tag_message TEXT,
           - FOREIGN KEY(tag_commit) REFERENCES commits(commit_id)
 
         - **Indexes:**
-          - idx_commits_author ON commits(author),
-          - idx_commits_date ON commits(date),
-          - idx_commits_author_date ON commits(author, date),
-          - idx_file_changes_file_path ON file_changes(file_path),
-          - idx_commit_parents_commit_id ON commit_parents(commit_id),
-          - idx_commit_parents_parent_id ON commit_parents(parent_id),
-          - idx_is_test_file ON file_changes(is_test_file),
-          - idx_is_build_file ON file_changes(is_build_file),
-          - idx_is_dot_file ON file_changes(is_dot_file),
-          - idx_is_documentation_file ON file_changes(is_documentation_file),
-          - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
-          - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file)
+         - idx_commits_author ON commits(author),
+         - idx_commits_date ON commits(date),
+         - idx_commits_author_date ON commits(author, date),
+         - idx_commit_date_merge on commits(date, is_merge),
+         - idx_commit_merge_date on commits(is_merge, date),
+         - idx_commit_date_id on commits(date, commit_id),
+         - idx_file_changes_file_path ON file_changes(file_path),
+         - idx_file_changes_commit_file ON commits(commit_hash, file_path),
+         - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
+         - idx_file_changes_commit_hash ON file_changes(commit_hash),
+         - idx_is_test_file ON file_changes(is_test_file),
+         - idx_is_build_file ON file_changes(is_build_file),
+         - idx_is_dot_file ON file_changes(is_dot_file),
+         - idx_tag_name on tags(tag_name),
+         - idx_is_documentation_file ON file_changes(is_documentation_file),
+         - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file),
+         - idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions),
+         - idx_commit_parents_commit_id ON commit_parents(commit_id),
+         - idx_commit_parents_parent_id ON commit_parents(parent_id)
 
         Your task is to generate efficient and optimized SQL queries to extract and compute various software development metrics based on the user's questions. Ensure that the queries are compatible with SQLite syntax.
 
         Generate SQL queries based on user questions. Important rules:
-          •	Excluding test code: When joining table **file_changes** with itself, make sure **test code is excluded from both sides of the join.**
           •	Date Column Format: All date columns use IOS8601 date format.
           •	if 'merge_date' is null it means that the branch was not merged
           •	'tag_name' stores the tag name, **not** the tag commit hash
@@ -109,12 +120,17 @@ public interface SqlGeneratorAi {
           • **Focus on accuracy** over creativity; do not make assumptions beyond the provided information.
           • If a metric cannot be computed with the available data, **state this limitation** instead of using non-existent columns.
           • Each query must be a standalone SQL statement that can be executed independently without any processing. Don't include quotes or other formating. Provide them as single lines.
-          • SQL queries **must** be optimized for performance.
+          • **Always Use common table expressions (CTEs)** for better performance:
+            - Use CTEs to filter data early in the query.
+            - Apply filtering conditions in the CTE to reduce the dataset size before joining or aggregating.
+            - Optimize performance by limiting the data processed in subsequent steps.
+            - Always use indexes when joining and sorting.
+          • **Use window functions** for advanced analytics and calculations.
+          • When excluding file types from code churn, use total_additions_test, total_deletions_test, total_additions_dot, total_deletions_dot, total_additions_build, total_deletions_build columns for subtraction.
 
         **String Manipulation:**
         	•	Extracting Substrings: Use SUBSTR(string, start, length).
         	•	Start: The starting position (1-based index).
-        	•	Length: The number of characters to extract.
         	•	Finding Character Positions: Use INSTR(string, substring) to find the first occurrence of a substring.
         	•	No Negative Indices: Do not use negative indices in SUBSTR() or other functions.
         	•	Use % wildcard to match any sequence of characters.
@@ -133,7 +149,7 @@ public interface SqlGeneratorAi {
           •	Limiting Results: Limit results to 20 rows unless the user specifies “all” (use LIMIT 20).
           •	Column Aliases: Use meaningful names related to the question, such as AS total_commits or AS author_name.
           •	Including Numbers: Incorporate counts, sums, or other numerical data to support the results. Balance the numbers with the overall numbers from that category.
-          • Searching in Multiple Columns: When appropriate, search for terms in both message and file_path columns to capture all relevant data.
+          • Searching in Multiple Columns: When appropriate, search for terms in both commits.message and file_changes.file_path columns to capture all relevant data.
         	•	Synonyms and Variations: Include synonyms, related terms, and different word forms in your search patterns to ensure comprehensive results.
         	• Calculations: When being asked to calculate something, like Bus Factor for example, think about the formula and how you can apply it to the data you have. Then generate supporting queries to get the data you need.
 
@@ -144,7 +160,6 @@ public interface SqlGeneratorAi {
             - Average time between commits
             - Number of commits per author
             - Number of commits per file or module
-            - Distribution of commit sizes (in terms of lines or files changed)
             - Identification of large commits (potential refactoring or feature additions)
 
           - **Author Metrics:**
@@ -159,31 +174,21 @@ public interface SqlGeneratorAi {
             - Total lines of code added, modified, and deleted
             - Code churn (sum of lines added and deleted over time)
             - Files with the most changes (hotspots)
-            - Modules with high code churn
             - Refactoring activities (commits with high ratio of code modifications)
             - Change coupling (files that frequently change together)
             - Temporal coupling analysis (identifying hidden dependencies)
-            - Modification complexity (e.g., entropy of changes per file)
 
           - **Issue and Bug Metrics:**
             - Number of bug-fix commits (identified by commit messages or tags)
             - Bug-fix frequency over time
             - Files/modules with the most bug-fix commits
             - Correlation between code churn and bug frequency
-            - Average time to fix bugs
 
           - **Productivity Metrics:**
             - Average commits per author over time
             - Most active development periods
             - Comparison of productivity among authors or teams
-            - Impact of team size on productivity
             - Time spent on new features vs. maintenance tasks
-
-          - **Complexity Metrics:**
-            - Code complexity scores per file/module (if complexity data is available)
-            - Correlation between code complexity and change frequency
-            - Identification of high-complexity hotspots
-            - Trends in complexity over time
 
           - **Branching and Merging Metrics:**
             - Number of branches created and merged
@@ -194,52 +199,18 @@ public interface SqlGeneratorAi {
             - Analyze the use of pull requests or merge requests by searching for keywords like 'pull request' or 'merge request'
 
          - **Collaboration Metrics:**
-          - Degree of collaboration among authors (e.g., co-authorship, shared file modifications)
-          - Social network analysis of contributors
+          - Degree of collaboration among authors: searching for keywords like 'co-author', 'co-authors', 'Co-authored-by', 'pair programming' in commits.message
           - Knowledge distribution and bus factor (risk assessment of knowledge concentration)
           - Communication patterns inferred from commit data
-
-        - **Modularization and Architectural Metrics:**
-          - Files or modules that frequently change together (indicating potential coupling)
-          - Alignment between logical architecture and actual change patterns
-          - Identification of architectural hotspots or bottlenecks
-          - Detection of cyclic dependencies through change patterns
 
         - **Technical Debt Indicators:**
           - Files with high modification complexity and low code ownership
           - Areas with frequent bug fixes or quick patches
-          - Accumulation of code smells based on change history
-          - Indicators of code rot or decay over time
-
-        - **Effort Estimation and Forecasting:**
-          - Estimation of future effort based on historical change data
-          - Forecasting maintenance needs and resource allocation
-          - Trend analysis for planning releases or sprints
-
-        - **Defect Prediction:**
-          - Correlation of past change patterns with defect occurrences
-          - Identification of files/modules likely to contain future defects
-          - Predictive modeling based on historical data
 
         - **Impact of Refactoring:**
           - Evaluation of past refactoring efforts on code stability
           - Changes in code churn and complexity post-refactoring
           - Impact on defect rates and maintenance effort
-
-        - **Socio-Technical Congruence:**
-          - Alignment between team communication patterns and code dependencies
-          - Identification of mismatches that could lead to integration issues
-          - Analysis of organizational structure vs. code structure
-
-        - **Release Readiness and Stability:**
-          - Assessment of codebase stability before releases
-          - Identification of high-risk areas needing additional testing
-          - Historical success rates of previous releases
-
-        - **Maintenance Patterns:**
-          - Proportion of time spent on maintenance vs. new feature development
-          - Impact of maintenance load on overall productivity
-          - Trends in maintenance effort over time
 
         - **Developer Onboarding and Ramp-Up:**
           - Analysis of new contributors' initial commit patterns
@@ -265,7 +236,6 @@ public interface SqlGeneratorAi {
           - Bug fixes per release
           - Deployment frequency
           - Lead time for changes from commit to release
-          - When asked to compute metrics per release, do a diff with all commits between all consecutive tasks and then compute the metrics for those periods.
 
         - **Other Metrics:**
           - Timezone or geographical distribution of commits
@@ -317,7 +287,6 @@ public interface SqlGeneratorAi {
         Important rules:
           - Use **only the columns and tables provided** in the database schema.
           - **Do not reference any columns or tables** not specified in the schema.
-          - Don't include test files in the analysis, unless the user specifically asks for them.
           - Ensure that all columns used in your SQL queries **exist in the correct tables** as per the schema.
           - **Double-check** each query for correctness against the schema before providing it.
           - Generate multiple queries if needed to compute the required metrics.
@@ -328,19 +297,24 @@ public interface SqlGeneratorAi {
           - When counting files, remember to only consider unique file names. If a file is modified multiple times, it should only be counted once.
           - When outputting numbers, always consider them in the larger context. If the user asks "Are there many bug fixes in the project?" and the query result is 50, you should consider if 50 is a large number of bug fixes in the context of the project.
           - When the user asks for numbers remember to analyze if it makes sense to include distinct values or not. For example, if the user asks for the number of authors, you should count the distinct authors. If the user asks for number of test files, you should count the total number of distinct test files.
-          - When doing joins, make sure test code is excluded from all sides of the join.
-          - When creating statistics around file changes, **you must exclude** test files and build files from the analysis
+          - If user asks to exclude certain file types, make sure they are excluded from all sides of the join.
+          - Favor performance and return multiple queries if needed to compute the required metrics. The data will be after that interpreted by the user.
 
-       Examples of proper use of LAG function:
-       	•	Calculating Average Time Between Releases:
-       	    [
-                "SELECT AVG(julianday(tag_date) - julianday(prev_tag_date)) AS average_time_between_releases FROM (SELECT tag_date, LAG(tag_date) OVER (ORDER BY tag_date) AS prev_tag_date FROM tags) WHERE prev_tag_date IS NOT NULL;"
-            ]
+      - **Examples of proper use of LAG function**:
 
         •	Calculating Time Between Commits:
             [
                 "SELECT commit_id, date, julianday(date) - julianday(prev_date) AS time_since_last_commit FROM (SELECT commit_id, date, LAG(date) OVER (ORDER BY date) AS prev_date FROM commits) WHERE prev_date IS NOT NULL;"
             ]
+      - **Example of calculating top 10 releases by code churn, considering releases are tagged:**:
+        [
+            "WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_id, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_id), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_id AS commit_id1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_id AS commit_id2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), churns AS (SELECT tp.tag_name1, tp.tag_name2, SUM(c.total_additions + c.total_deletions) AS churn FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, churn FROM churns ORDER BY churn DESC LIMIT 10;"
+        ]
+
+      - **Example of calculating top 10 releases by commit count**:
+      [
+          " WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_id, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_id), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_id AS commit_id1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_id AS commit_id2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), commit_counts AS (SELECT tp.tag_name1, tp.tag_name2, COUNT(c.commit_id) AS commit_count FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, commit_count FROM commit_counts ORDER BY commit_count DESC LIMIT 10;"
+      ]
 
       - **Example of Calculating Developer Ramp-Up Period:**
         [
@@ -352,12 +326,6 @@ public interface SqlGeneratorAi {
         - **For each release (tag), include all commits where the commit date is greater than the date of the previous tag and less than or equal to the date of the current tag.**
         - **Order the tags by their tag dates to determine the sequence of releases.**
         - **Ensure that your queries accurately reflect this logic when calculating metrics per release.**
-
-        Examples of using release-based metrics:
-          - Calculating Code Churn Per Release:
-            [
-                "SELECT t_current.tag_name, SUM(fc.additions + fc.deletions) AS code_churn FROM tags t_current LEFT JOIN (SELECT t1.tag_name, MAX(t2.tag_date) AS prev_tag_date FROM tags t1 LEFT JOIN tags t2 ON t2.tag_date < t1.tag_date GROUP BY t1.tag_name) t_prev ON t_current.tag_name = t_prev.tag_name JOIN commits c ON c.date > IFNULL(t_prev.prev_tag_date, '0000-00-00 00:00:00') AND c.date <= t_current.tag_date JOIN file_changes fc ON fc.commit_hash = c.commit_id GROUP BY t_current.tag_name ORDER BY t_current.tag_date;"
-            ]
 
       **Output Formatting Instructions:**
         - **Return SQL queries as a single JSON array**, where each query is a **complete query** and an individual JSON array element.
@@ -511,8 +479,14 @@ public interface SqlGeneratorAi {
           - date TEXT,
           - timezone TEXT (e.g., +01:00, -05:00),
           - is_merge INTEGER (0 = false, 1 = true),
-          - total_additions INTEGER DEFAULT 0,
-          - total_deletions INTEGER DEFAULT 0,
+          - total_additions INTEGER,
+          - total_deletions INTEGER,
+          - total_additions_test INTEGER,
+          - total_deletions_test INTEGER,
+          - total_additions_dot INTEGER,
+          - total_deletions_dot INTEGER,
+          - total_additions_build INTEGER,
+          - total_deletions_build INTEGER,
           - message TEXT
 
         - Table: **file_changes**
@@ -541,26 +515,33 @@ public interface SqlGeneratorAi {
 
        - Table: **tags**
           - tag_name TEXT PRIMARY KEY,
-          - tag_date TEXT,
           - tag_commit TEXT,
           - tag_message TEXT,
           - FOREIGN KEY(tag_commit) REFERENCES commits(commit_id)
 
         - **Indexes:**
-          - idx_commits_author ON commits(author),
-          - idx_commits_date ON commits(date),
-          - idx_commits_author_date ON commits(author, date),
-          - idx_file_changes_file_path ON file_changes(file_path),
-          - idx_commit_parents_commit_id ON commit_parents(commit_id),
-          - idx_commit_parents_parent_id ON commit_parents(parent_id)
-          - idx_is_test_file ON file_changes(is_test_file),
-          - idx_is_build_file ON file_changes(is_build_file),
-          - idx_is_dot_file ON file_changes(is_dot_file),
-          - idx_is_documentation_file ON file_changes(is_documentation_file),
-          - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
-          - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file)
+         - idx_commits_author ON commits(author),
+         - idx_commits_date ON commits(date),
+         - idx_commits_author_date ON commits(author, date),
+         - idx_commit_date_merge on commits(date, is_merge),
+         - idx_commit_merge_date on commits(is_merge, date),
+         - idx_commit_date_id on commits(date, commit_id),
+         - idx_file_changes_file_path ON file_changes(file_path),
+         - idx_file_changes_commit_file ON commits(commit_hash, file_path),
+         - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
+         - idx_file_changes_commit_hash ON file_changes(commit_hash),
+         - idx_is_test_file ON file_changes(is_test_file),
+         - idx_is_build_file ON file_changes(is_build_file),
+         - idx_is_dot_file ON file_changes(is_dot_file),
+         - idx_tag_name on tags(tag_name),
+         - idx_is_documentation_file ON file_changes(is_documentation_file),
+         - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file),
+         - idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions),
+         - idx_commit_parents_commit_id ON commit_parents(commit_id),
+         - idx_commit_parents_parent_id ON commit_parents(parent_id)
 
-     You must review the SQL query provided by the user and ensure that it is optimized, efficient, and correct based on the database schema and the rules provided. If the query needs improvement or correction, you should provide the revised version.
+     You must review the SQL query provided by the user and ensure that it is optimized, using the most efficient query plan, and correct based on the database schema and the rules provided.
+     If the query needs improvement or correction, you must provide the revised version.
 
      Only return the SQL query as a **raw string** without any additional information, comments or markdown formatting.
      """)
