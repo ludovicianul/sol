@@ -14,7 +14,7 @@ Sol is a command line application that allows you to chat with your git history.
 
 - **Contributors:** Total number of contributors, top contributors by commits or lines changed.
 - **Collaboration:** Networks of authors collaborating on the same files.
-- **Activity:** Developer activity patterns and turnover rates.
+- **Activity:** Developer activity patterns.
 
 ## **Code Change Metrics**
 
@@ -37,7 +37,7 @@ Sol is a command line application that allows you to chat with your git history.
 
 ## **Technical Debt & Maintenance**
 
-- **Debt Indicators:** Frequent bug areas, code smells, and code decay.
+- **Debt Indicators:** Frequent bug areas.
 - **Maintenance Patterns:** Time spent on maintenance vs. new features and trends over time.
 
 ## **Release Metrics**
