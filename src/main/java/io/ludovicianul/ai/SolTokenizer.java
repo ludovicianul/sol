@@ -15,7 +15,7 @@ public class SolTokenizer {
   private final int maxTokens;
 
   private SolTokenizer(String model, int maxTokens) {
-    tokenizer = new OpenAiTokenizer(model);
+    this.tokenizer = new OpenAiTokenizer(model);
     this.maxTokens = maxTokens;
   }
 
@@ -26,7 +26,7 @@ public class SolTokenizer {
   public String limitTokens(String text) {
     try {
       int tokenCount = tokenizer.estimateTokenCountInText(text);
-      Logger.debug("Total tokens to be sent: " + tokenCount);
+      Logger.debug("Total tokens to be sent, before limiting: " + tokenCount);
 
       if (tokenCount <= maxTokens) {
         return text;
@@ -45,7 +45,6 @@ public class SolTokenizer {
     if (cleanedText.startsWith("[")) {
       cleanedText = extractTextInsideBrackets(cleanedText);
     }
-    cleanedText = extractTextInsideBrackets(cleanedText);
 
     return cleanedText;
   }
