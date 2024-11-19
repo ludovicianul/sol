@@ -48,6 +48,11 @@ public class SolCommand implements Runnable {
   int timeout = 10;
 
   @CommandLine.Option(
+      names = {"-X", "--maxTokensToAnalyze"},
+      description = "Max tokens to use when interpreting the results. Default: 5000")
+  int maxTokens = 5000;
+
+  @CommandLine.Option(
       names = {"-i", "--index"},
       description = "Index current git repo")
   boolean index;
@@ -80,7 +85,7 @@ public class SolCommand implements Runnable {
     validateEnvironmentVariables();
     checkDbIsAvailable();
 
-    sqlQueryService = new SqlQueryService(aiService, aiModel, baseUrl);
+    sqlQueryService = new SqlQueryService(aiService, aiModel, baseUrl, maxTokens);
     QueryResult queryResult = sqlQueryService.askQuestion("The user question is: " + question);
 
     displayResult(queryResult);

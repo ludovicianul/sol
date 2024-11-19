@@ -7,6 +7,7 @@ import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.service.AiServices;
 import io.ludovicianul.SolCommand;
+import io.ludovicianul.ai.SolTokenizer;
 import io.ludovicianul.ai.SqlGeneratorAi;
 import io.ludovicianul.db.SolDb;
 import io.ludovicianul.log.Logger;
@@ -22,9 +23,10 @@ import java.util.stream.Collectors;
 
 public class SqlQueryService {
   private final SqlGeneratorAi sqlGenerator;
+  private final SolTokenizer solTokenizer;
 
   public SqlQueryService(
-      SolCommand.AiSystem modelType, String userSuppliedModel, String ollamaUrl) {
+      SolCommand.AiSystem modelType, String userSuppliedModel, String ollamaUrl, int maxTokens) {
     String openAiKey = System.getenv("OPENAI_API_KEY");
     String anthropicKey = System.getenv("ANTHROPIC_API_KEY");
 
@@ -64,10 +66,14 @@ public class SqlQueryService {
     Logger.debug("Ai system: " + modelType + ", model: " + modelName);
 
     this.sqlGenerator = AiServices.create(SqlGeneratorAi.class, aiModel);
+    this.solTokenizer = SolTokenizer.createTokenizer(modelName, maxTokens);
   }
 
   public String analyzeWithAi(QueryResult result) {
-    return sqlGenerator.beautifyResult(result.piped());
+    String pipedResult = result.piped();
+    String limitedTokens = solTokenizer.limitTokens(pipedResult);
+
+    return sqlGenerator.beautifyResult(limitedTokens);
   }
 
   public QueryResult askQuestion(String userQuestion) {
