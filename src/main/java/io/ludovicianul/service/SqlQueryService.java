@@ -120,10 +120,12 @@ public class SqlQueryService {
       String errorMessage = "Error while executing query: %s".formatted(e.getMessage());
       String newQuery =
           sqlGenerator.reviewSqlQuery("SQL query: " + query + "\nError Message: " + errorMessage);
-
       Logger.debug("Revised query: " + newQuery);
+
+      String newQueryCleaned = solTokenizer.clean(newQuery);
+      Logger.debug("Revised cleaned query: " + newQueryCleaned);
       try {
-        queryResult = SolDb.executeQuery(newQuery);
+        queryResult = SolDb.executeQuery(newQueryCleaned);
       } catch (SQLException e2) {
         Logger.debug("Error while executing revised query: " + e2.getMessage());
       }

@@ -42,6 +42,9 @@ public class SolTokenizer {
 
   public String clean(String markdownText) {
     String cleanedText = removeCodeBlocks(markdownText);
+    if (cleanedText.startsWith("[")) {
+      cleanedText = extractTextInsideBrackets(cleanedText);
+    }
     cleanedText = extractTextInsideBrackets(cleanedText);
 
     return cleanedText;
