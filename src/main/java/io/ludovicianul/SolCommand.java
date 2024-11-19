@@ -49,8 +49,8 @@ public class SolCommand implements Runnable {
 
   @CommandLine.Option(
       names = {"-X", "--maxTokensToAnalyze"},
-      description = "Max tokens to use when interpreting the results. Default: 5000")
-  int maxTokens = 5000;
+      description = "Max tokens to use when interpreting the results. Default: 10000")
+  int maxTokens = 10000;
 
   @CommandLine.Option(
       names = {"-i", "--index"},

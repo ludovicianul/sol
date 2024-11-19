@@ -43,14 +43,14 @@ public class SqlQueryService {
               OpenAiChatModel.builder()
                   .apiKey(openAiKey)
                   .modelName(modelName)
-                  .maxTokens(5000)
+                  .maxTokens(maxTokens)
                   .temperature(0.0)
                   .build();
           case ANTHROPIC ->
               AnthropicChatModel.builder()
                   .apiKey(anthropicKey)
                   .modelName(modelName)
-                  .maxTokens(5000)
+                  .maxTokens(maxTokens)
                   .temperature(0.0)
                   .build();
           case OLLAMA ->
@@ -59,7 +59,11 @@ public class SqlQueryService {
                   .model(modelName)
                   .timeout(Duration.ofSeconds(30))
                   .options(
-                      Options.builder().temperature(0.0).numCtx(20000).numPredict(20000).build())
+                      Options.builder()
+                          .temperature(0.0)
+                          .numCtx(maxTokens)
+                          .numPredict(maxTokens)
+                          .build())
                   .build();
         };
 
