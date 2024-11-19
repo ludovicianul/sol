@@ -14,6 +14,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,7 +29,7 @@ import java.util.function.ToIntFunction;
 @Singleton
 @Unremovable
 public class SolDb {
-
+  private static final DateTimeFormatter ISO_FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
   private static final String DB_URL = "jdbc:sqlite:.sol/commits.db";
 
   public static void initializeDatabase() {
@@ -182,10 +184,10 @@ public class SolDb {
     try (Connection conn = DriverManager.getConnection(DB_URL);
         PreparedStatement branchStmt = conn.prepareStatement(insertBranchSQL)) {
 
-      branchStmt.setString(1, branch.branchDate());
+      branchStmt.setString(1, branch.name());
       branchStmt.setInt(2, branch.active());
-      branchStmt.setString(3, branch.creationDate());
-      branchStmt.setString(4, branch.mergeDate());
+      branchStmt.setString(3, convertDateToUtc(branch.creationDate()));
+      branchStmt.setString(4, convertDateToUtc(branch.mergeDate()));
       branchStmt.executeUpdate();
     } catch (SQLException e) {
       System.err.println("There was an issue inserting branches: " + e.getMessage());
@@ -240,7 +242,7 @@ public class SolDb {
 
           commitStmt.setString(1, commit.commitHash());
           commitStmt.setString(2, commit.author());
-          commitStmt.setString(3, commit.date());
+          commitStmt.setString(3, convertDateToUtc(commit.date()));
           commitStmt.setString(4, zone);
           commitStmt.setInt(5, commit.parents().size() > 1 ? 1 : 0);
           commitStmt.setInt(6, totalAdd);
@@ -343,5 +345,10 @@ public class SolDb {
       }
     }
     return results;
+  }
+
+  private static String convertDateToUtc(String date) {
+    return ISO_FORMATTER.format(
+        OffsetDateTime.parse(date).toZonedDateTime().withZoneSameInstant(ZoneId.of("UTC")));
   }
 }
