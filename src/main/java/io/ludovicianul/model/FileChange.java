@@ -8,4 +8,9 @@ public record FileChange(
     boolean isTestFile,
     boolean isBuildFile,
     boolean isDotFile,
-    boolean isDocumentationFile) {}
+    boolean isDocumentationFile) {
+
+  public boolean isAddOrModify() {
+    return changeType.equals("A") || changeType.equals("M");
+  }
+}

@@ -81,7 +81,7 @@ public interface SqlGeneratorAi {
 
   Your task is to generate efficient and optimized SQL queries to extract and compute various software development metrics based on the user's questions. Ensure that the queries are compatible with SQLite syntax.
 
-  Generate SQL queries based on user questions. Important rules:
+  **Generate SQL queries based on user questions. Important rules:**
     •	Date Column Format: All date columns use IOS8601 date format.
     •	if 'merge_date' is null it means that the branch was not merged
     •	'tag_name' stores the tag name, **not** the tag commit hash

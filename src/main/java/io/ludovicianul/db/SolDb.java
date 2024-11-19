@@ -223,17 +223,15 @@ public class SolDb {
 
         for (CommitRecord commit : commits) {
           // Prepare commit batch
-          int totalAdd = count(commit, "A", x -> true, FileChange::additions);
-          int totalDel = count(commit, "D", x -> true, FileChange::deletions);
+          int totalAdd = count(commit, x -> true, FileChange::additions);
+          int totalDel = count(commit, x -> true, FileChange::deletions);
 
-          int totalDelTestFiles = count(commit, "D", FileChange::isTestFile, FileChange::deletions);
-          int totalAddTestFiles = count(commit, "A", FileChange::isTestFile, FileChange::additions);
-          int totalDelDotFiles = count(commit, "D", FileChange::isDotFile, FileChange::deletions);
-          int totalAddDotFiles = count(commit, "A", FileChange::isDotFile, FileChange::additions);
-          int totalDelBuildFiles =
-              count(commit, "D", FileChange::isBuildFile, FileChange::deletions);
-          int totalAddBuildFiles =
-              count(commit, "A", FileChange::isBuildFile, FileChange::additions);
+          int totalDelTestFiles = count(commit, FileChange::isTestFile, FileChange::deletions);
+          int totalAddTestFiles = count(commit, FileChange::isTestFile, FileChange::additions);
+          int totalDelDotFiles = count(commit, FileChange::isDotFile, FileChange::deletions);
+          int totalAddDotFiles = count(commit, FileChange::isDotFile, FileChange::additions);
+          int totalDelBuildFiles = count(commit, FileChange::isBuildFile, FileChange::deletions);
+          int totalAddBuildFiles = count(commit, FileChange::isBuildFile, FileChange::additions);
 
           String zone =
               OffsetDateTime.parse(commit.date())
@@ -306,12 +304,9 @@ public class SolDb {
   }
 
   private static int count(
-      CommitRecord commit,
-      String type,
-      Predicate<FileChange> predicate,
-      ToIntFunction<FileChange> sumFunction) {
+      CommitRecord commit, Predicate<FileChange> predicate, ToIntFunction<FileChange> sumFunction) {
     return commit.fileChanges().stream()
-        .filter(f -> f.changeType().equals(type))
+        .filter(FileChange::isAddOrModify)
         .filter(predicate)
         .mapToInt(sumFunction)
         .sum();
@@ -348,6 +343,9 @@ public class SolDb {
   }
 
   private static String convertDateToUtc(String date) {
+    if (date == null) {
+      return null;
+    }
     return ISO_FORMATTER.format(
         OffsetDateTime.parse(date).toZonedDateTime().withZoneSameInstant(ZoneId.of("UTC")));
   }

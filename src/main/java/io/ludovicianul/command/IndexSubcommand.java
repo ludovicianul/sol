@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
 public class IndexSubcommand implements Runnable {
 
   private final int timeout;
-  private String mainBranch;
   private List<CommitRecord> commits;
   private Map<String, String> branchAndCreationDates;
 
@@ -36,7 +34,6 @@ public class IndexSubcommand implements Runnable {
 
   @Override
   public void run() {
-    mainBranch = getMainBranch();
     initializeDatabase();
     parseCommits();
     parseBranches();
@@ -46,13 +43,6 @@ public class IndexSubcommand implements Runnable {
   private void initializeDatabase() {
     SolDb.initializeDatabase();
     Logger.print("Database initialized");
-  }
-
-  private String getMainBranch() {
-    String branch =
-        ProcessRunner.INSTANCE.getSingleLineProcessOut(timeout, "git branch --show-current");
-
-    return Optional.ofNullable(branch).orElse("main");
   }
 
   private void parseBranches() {
@@ -86,12 +76,18 @@ public class IndexSubcommand implements Runnable {
     List<String> tags =
         ProcessRunner.INSTANCE.getMultiLineProcessOut(
             timeout,
-            "git for-each-ref --format='%(refname:short),%(object),%(creatordate:iso-strict),%(contents)' refs/tags");
+            "git for-each-ref --format='%(refname:short),%(objectname),%(object),%(creatordate:iso-strict),%(contents)' refs/tags");
 
     tags.stream()
         .map(tag -> tag.split(","))
-        .filter(tag -> tag.length == 4)
-        .map(tag -> new Tag(tag[0].trim(), tag[1].trim(), tag[2].trim(), tag[3].trim()))
+        .filter(tag -> tag.length == 5)
+        .map(
+            tag ->
+                new Tag(
+                    tag[0].trim(),
+                    tag[2].trim().isEmpty() ? tag[1].trim() : tag[2].trim(),
+                    tag[3].trim(),
+                    tag[4].trim()))
         .forEach(SolDb::insertTag);
 
     Logger.print("Finished collecting tags");
