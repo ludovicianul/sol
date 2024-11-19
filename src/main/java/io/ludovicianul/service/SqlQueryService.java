@@ -77,11 +77,13 @@ public class SqlQueryService {
   }
 
   public QueryResult askQuestion(String userQuestion) {
-    String sql = sqlGenerator.generateSqlQuery(userQuestion);
+    String initialSql = sqlGenerator.generateSqlQuery(userQuestion);
+    String cleanSql = solTokenizer.clean(initialSql);
 
-    Logger.debug("Generated SQL query: " + sql + "\n");
+    Logger.debug("Generated SQL query: " + cleanSql + "\n");
 
-    List<String> queries = new Gson().fromJson(sql, new TypeToken<List<String>>() {}.getType());
+    List<String> queries =
+        new Gson().fromJson(cleanSql, new TypeToken<List<String>>() {}.getType());
     StringBuilder finalResult = new StringBuilder();
     int resultLength = 0;
 
@@ -104,7 +106,7 @@ public class SqlQueryService {
       return QueryResult.empty();
     }
 
-    return new QueryResult(sql, finalResult.toString(), userQuestion);
+    return new QueryResult(cleanSql, finalResult.toString(), userQuestion);
   }
 
   private List<Map<String, Object>> executeQuery(String query) {
