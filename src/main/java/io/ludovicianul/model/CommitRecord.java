@@ -8,4 +8,9 @@ public record CommitRecord(
     String date,
     String message,
     List<FileChange> fileChanges,
-    List<String> parents) {}
+    List<String> parents) {
+
+  public boolean messageContains(String keyword) {
+    return message.contains(keyword);
+  }
+}

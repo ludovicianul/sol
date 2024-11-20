@@ -29,7 +29,7 @@ public class IndexSubcommand implements Runnable {
 
   public IndexSubcommand(int timeout) {
     this.timeout = timeout;
-    fileTypeService = new FileTypeService();
+    this.fileTypeService = new FileTypeService();
   }
 
   @Override
@@ -95,6 +95,7 @@ public class IndexSubcommand implements Runnable {
 
   private void parseBranches(String merged) {
     Logger.print("Collecting " + merged + " branches...");
+    boolean isMerged = "merged".equals(merged);
 
     List<String> branches =
         ProcessRunner.INSTANCE.getMultiLineProcessOut(
@@ -102,28 +103,28 @@ public class IndexSubcommand implements Runnable {
     Set<String> mergedBranches =
         branches.stream()
             .map(String::trim)
-            .filter(branch -> !branch.toLowerCase().endsWith("main"))
-            .filter(branch -> !branch.toLowerCase().endsWith("master"))
-            .map(branch -> branch.replace("remotes/", "").replace("origin/", ""))
+            .filter(Branch::isNotMaster)
+            .map(Branch::removeRemoteOriginPrefix)
             .collect(Collectors.toSet());
 
     mergedBranches.stream()
-        .map(
-            branch -> {
-              String creationDate = branchAndCreationDates.get(branch);
-              String mergeDate = "merged".equals(merged) ? getMergeDate(branch) : null;
-              int active = "merged".equals(merged) ? 0 : 1;
-
-              return new Branch(branch, active, creationDate, mergeDate);
-            })
+        .map(branch -> createBranch(branch, isMerged))
         .forEach(SolDb::insertBranch);
 
     Logger.print("Finished collecting " + merged + " branches");
   }
 
+  private Branch createBranch(String branch, boolean isMerged) {
+    String creationDate = branchAndCreationDates.get(branch);
+    String mergeDate = isMerged ? getMergeDate(branch) : null;
+    int active = isMerged ? 0 : 1;
+
+    return new Branch(branch, active, creationDate, mergeDate);
+  }
+
   private String getMergeDate(String branch) {
     return commits.stream()
-        .filter(commit -> commit.message().contains(branch))
+        .filter(commit -> commit.messageContains(branch))
         .findFirst()
         .map(CommitRecord::date)
         .orElse(null);

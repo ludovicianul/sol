@@ -33,7 +33,7 @@ public class SolDb {
   private static final String DB_URL = "jdbc:sqlite:.sol/commits.db";
 
   public static void initializeDatabase() {
-    createSolIfNoExists();
+    createSolDotFolderIfNoExists();
     removeSolDbIfExists();
 
     try (Connection conn = DriverManager.getConnection(DB_URL)) {
@@ -155,7 +155,7 @@ public class SolDb {
     }
   }
 
-  private static void createSolIfNoExists() {
+  private static void createSolDotFolderIfNoExists() {
     File file = new File(".sol");
     if (!file.exists()) {
       file.mkdir();
