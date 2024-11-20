@@ -1,0 +1,42 @@
+<svg width="300" height="150" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 150">
+  <!-- Background (optional) -->
+  <rect width="300" height="150" fill="transparent"/>
+
+  <!-- "s" Letter -->
+  <text x="30" y="100" font-size="80" fill="#1ABC9C" font-family="monospace">s</text>
+
+  <!-- "O" as Sun with Git Branches -->
+  <g transform="translate(100, 20)">
+    <!-- Sun with Gradient -->
+    <circle cx="50" cy="50" r="40" fill="transparent"/>
+
+    <!-- Sun Rays -->
+    <g stroke="#1ABC9C" stroke-width="2">
+      <line x1="50" y1="7" x2="50" y2="-7"/>
+      <line x1="50" y1="93" x2="50" y2="108"/>
+      <line x1="7" y1="50" x2="-7" y2="50"/>
+      <line x1="93" y1="50" x2="108" y2="50"/>
+      <line x1="20" y1="20" x2="10" y2="10"/>
+      <line x1="80" y1="80" x2="90" y2="90"/>
+      <line x1="20" y1="80" x2="10" y2="90"/>
+      <line x1="80" y1="20" x2="90" y2="10"/>
+    </g>
+
+    <!-- Git Branches -->
+    <g stroke="#1ABC9C" stroke-width="3" fill="none">
+      <!-- Additional Branch 1 -->
+      <line x1="50" y1="60" x2="30" y2="45"/>
+
+      <!-- Additional Branch 2 -->
+      <line x1="50" y1="60" x2="70" y2="45"/>
+
+      <!-- Nodes -->
+      <circle cx="50" cy="60" r="4" fill="#1ABC9C"/>
+      <circle cx="30" cy="45" r="4" fill="#1ABC9C"/>
+      <circle cx="70" cy="45" r="4" fill="#1ABC9C"/>
+    </g>
+  </g>
+
+  <!-- "l" Letter -->
+  <text x="215" y="107" font-size="80" fill="#1ABC9C" font-family="monospace">l</text>
+</svg>
