@@ -100,6 +100,12 @@ Once the indexing is done, you can start querying your git history. Here are a f
 sol -q "What is the average time between commits?"
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./images/question.gif">
+  <source media="(prefers-color-scheme: light)" srcset="./images/question.gif">
+  <img width="600" alt="sol --index" src="./images/question.gif">
+</picture>
+
 ```bash
 sol -q "Calculate the bus factor for all developers"
 ```
