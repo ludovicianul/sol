@@ -3,7 +3,7 @@
   <rect width="300" height="150" fill="transparent"/>
 
   <!-- "s" Letter -->
-  <text x="30" y="100" font-size="80" fill="#FFC107" font-family="monospace">s</text>
+  <text x="30" y="100" font-size="80" fill="#8A2BE2" font-family="monospace">s</text>
 
   <!-- "O" as Sun with Git Branches -->
   <g transform="translate(100, 20)">
@@ -11,7 +11,7 @@
     <circle cx="50" cy="50" r="40" fill="transparent"/>
 
     <!-- Sun Rays -->
-    <g stroke="#FFC107" stroke-width="2">
+    <g stroke="#8A2BE2" stroke-width="2">
       <line x1="50" y1="7" x2="50" y2="-7"/>
       <line x1="50" y1="93" x2="50" y2="108"/>
       <line x1="7" y1="50" x2="-7" y2="50"/>
@@ -23,7 +23,7 @@
     </g>
 
     <!-- Git Branches -->
-    <g stroke="#FFC107" stroke-width="3" fill="none">
+    <g stroke="#8A2BE2" stroke-width="3" fill="none">
       <!-- Additional Branch 1 -->
       <line x1="50" y1="60" x2="30" y2="45"/>
 
@@ -31,12 +31,12 @@
       <line x1="50" y1="60" x2="70" y2="45"/>
 
       <!-- Nodes -->
-      <circle cx="50" cy="60" r="4" fill="#FFB300"/>
-      <circle cx="30" cy="45" r="4" fill="#FFB300"/>
-      <circle cx="70" cy="45" r="4" fill="#FFB300"/>
+      <circle cx="50" cy="60" r="4" fill="#8A2BE2"/>
+      <circle cx="30" cy="45" r="4" fill="#8A2BE2"/>
+      <circle cx="70" cy="45" r="4" fill="#8A2BE2"/>
     </g>
   </g>
 
   <!-- "l" Letter -->
-  <text x="215" y="107" font-size="80" fill="#FFC107" font-family="monospace">l</text>
+  <text x="215" y="107" font-size="80" fill="#8A2BE2" font-family="monospace">l</text>
 </svg>
