@@ -103,7 +103,7 @@ sol -q "What is the average time between commits?"
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./images/question.gif">
   <source media="(prefers-color-scheme: light)" srcset="./images/question.gif">
-  <img width="600" alt="sol --index" src="./images/question.gif">
+  <img width="800" alt="sol --index" src="./images/question.gif">
 </picture>
 
 ```bash
