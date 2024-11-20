@@ -85,9 +85,9 @@ sol --index
 ```
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/ludovicianul/sol/blob/9e2479709…8cf2a91d14fdc45ba7e05b0/images/index.gif?raw=true">
-  <source media="(prefers-color-scheme: light)" srcset="https://github.com/ludovicianul/sol/blob/9e2479709…8cf2a91d14fdc45ba7e05b0/images/index.gif?raw=true">
-  <img width="600" alt="sol --index" src="https://github.com/ludovicianul/sol/blob/9e2479709…8cf2a91d14fdc45ba7e05b0/images/index.gif?raw=true">
+  <source media="(prefers-color-scheme: dark)" srcset="./images/index.gif">
+  <source media="(prefers-color-scheme: light)" srcset="./images/index.gif">
+  <img width="600" alt="sol --index" src="./images/index.gif">
 </picture>
 
 This will create a `.sol` directory at the root of your repository and store the necessary data to query your git history.
