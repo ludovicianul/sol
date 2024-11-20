@@ -1,6 +1,8 @@
-# What is sol?
+# sol
 
-Sol is a command line application that allows you to chat with your git history.
+<img src="images/sol.svg">
+
+Sol is a command line tool that allows you to chat with your git history.
 
 # 📊 Capabilities Overview
 
@@ -81,6 +83,12 @@ Before being able to query data from your git history, you need to index it. To 
 ```bash
 sol --index
 ```
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://github.com/ludovicianul/sol/blob/9e2479709…8cf2a91d14fdc45ba7e05b0/images/index.gif?raw=true">
+  <source media="(prefers-color-scheme: light)" srcset="https://github.com/ludovicianul/sol/blob/9e2479709…8cf2a91d14fdc45ba7e05b0/images/index.gif?raw=true">
+  <img width="600" alt="sol --index" src="https://github.com/ludovicianul/sol/blob/9e2479709…8cf2a91d14fdc45ba7e05b0/images/index.gif?raw=true">
+</picture>
 
 This will create a `.sol` directory at the root of your repository and store the necessary data to query your git history.
 
