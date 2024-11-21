@@ -106,7 +106,6 @@ public class IndexSubcommand implements Runnable {
             .filter(Branch::isNotMaster)
             .map(Branch::removeRemoteOriginPrefix)
             .collect(Collectors.toSet());
-
     mergedBranches.stream()
         .map(branch -> createBranch(branch, isMerged))
         .forEach(SolDb::insertBranch);

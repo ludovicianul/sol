@@ -1,5 +1,6 @@
 package io.ludovicianul;
 
+import io.ludovicianul.command.CaseInsensitiveAiSystemConverter;
 import io.ludovicianul.command.IndexSubcommand;
 import io.ludovicianul.log.Logger;
 import io.ludovicianul.model.QueryResult;
@@ -16,7 +17,7 @@ import picocli.CommandLine.Command;
     header =
         "%n@|bold,fg(208) sol - Statistics Over git Logs.|@%nGet meaningful insights around code and people behaviour from git activity.%n",
     mixinStandardHelpOptions = true,
-    version = "@|bold,fg(208) sol 1.0.4|@",
+    version = "@|bold,fg(208) sol 1.0.4 - Statistics Over git Logs|@",
     subcommands = {AutoComplete.GenerateCompletion.class})
 @TopCommand
 public class SolCommand implements Runnable {
@@ -28,6 +29,7 @@ public class SolCommand implements Runnable {
 
   @CommandLine.Option(
       names = {"-s", "--ai"},
+      converter = CaseInsensitiveAiSystemConverter.class,
       description = "The AI service to use. Default: OpenAI")
   AiSystem aiService = AiSystem.OPENAI;
 
@@ -74,6 +76,11 @@ public class SolCommand implements Runnable {
 
   @Override
   public void run() {
+    if (!index && question == null) {
+      spec.commandLine().usage(System.out);
+      return;
+    }
+
     Logger.setDebug(debug);
     Logger.printNewLine();
 
