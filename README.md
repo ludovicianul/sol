@@ -62,7 +62,7 @@ There are binaries available for Linux and macOS as well as cross-platform `uber
 
 # How to use sol?
 
-## Pre-requisites - OpenAI or Anthropic API key
+## Prerequisites - OpenAI or Anthropic API key
 
 Sol uses by default the OpenAI API to generate responses to your questions. You need to have an API key to use it.
 
