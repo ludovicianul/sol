@@ -1,6 +1,6 @@
 # sol
 
-<img src="images/sol.svg">
+<img src="images/sol.svg" width="80%" align="center">
 
 Sol is a command line tool that allows you to chat with your git history.
 
