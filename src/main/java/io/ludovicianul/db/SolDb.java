@@ -39,93 +39,121 @@ public class SolDb {
     try (Connection conn = DriverManager.getConnection(DB_URL)) {
       String createCommitsTable =
           """
-                    CREATE TABLE IF NOT EXISTS commits (
-                        commit_id TEXT PRIMARY KEY,
-                        author TEXT,
-                        date TEXT,
-                        timezone TEXT,
-                        is_merge INTEGER,
-                        total_additions INTEGER DEFAULT 0,
-                        total_deletions INTEGER DEFAULT 0,
-                        total_additions_test INTEGER DEFAULT 0,
-                        total_deletions_test INTEGER DEFAULT 0,
-                        total_additions_dot INTEGER DEFAULT 0,
-                        total_deletions_dot INTEGER DEFAULT 0,
-                        total_additions_build INTEGER DEFAULT 0,
-                        total_deletions_build INTEGER DEFAULT 0,
-                        message TEXT
-                    );
+            CREATE TABLE IF NOT EXISTS commits (
+                commit_hash TEXT,
+                repo_name TEXT,
+                author TEXT,
+                date TEXT,
+                timezone TEXT,
+                is_merge INTEGER,
+                total_additions INTEGER DEFAULT 0,
+                total_deletions INTEGER DEFAULT 0,
+                total_additions_test INTEGER DEFAULT 0,
+                total_deletions_test INTEGER DEFAULT 0,
+                total_additions_dot INTEGER DEFAULT 0,
+                total_deletions_dot INTEGER DEFAULT 0,
+                total_additions_build INTEGER DEFAULT 0,
+                total_deletions_build INTEGER DEFAULT 0,
+                message TEXT,
+                PRIMARY KEY (commit_hash, repo_name)
+            );
                     """;
 
       String createFileChangesTable =
           """
-                    CREATE TABLE IF NOT EXISTS file_changes (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        commit_hash TEXT,
-                        author TEXT,
-                        change_type TEXT,
-                        file_path TEXT,
-                        additions INTEGER,
-                        deletions INTEGER,
-                        is_test_file INTEGER,
-                        is_build_file INTEGER,
-                        is_dot_file INTEGER,
-                        is_documentation_file INTEGER,
-                        FOREIGN KEY(commit_hash) REFERENCES commits(commit_id)
-                    );
-                    """;
+              CREATE TABLE IF NOT EXISTS file_changes (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  commit_hash TEXT,
+                  repo_name TEXT,
+                  author TEXT,
+                  change_type TEXT,
+                  file_path TEXT,
+                  additions INTEGER,
+                  deletions INTEGER,
+                  is_test_file INTEGER,
+                  is_build_file INTEGER,
+                  is_dot_file INTEGER,
+                  is_documentation_file INTEGER,
+                  FOREIGN KEY(commit_hash) REFERENCES commits(commit_hash)
+              );
+              """;
 
       String commitParentsTable =
           """
-                    CREATE TABLE IF NOT EXISTS commit_parents (
-                        commit_id TEXT,
-                        parent_id TEXT,
-                        FOREIGN KEY(commit_id) REFERENCES commits(commit_id),
-                        FOREIGN KEY(parent_id) REFERENCES commits(commit_id)
-                    );
-                    """;
+              CREATE TABLE IF NOT EXISTS commit_parents (
+                  commit_hash TEXT,
+                  repo_name TEXT,
+                  parent_hash TEXT,
+                  PRIMARY KEY (commit_hash, repo_name, parent_hash),
+                  FOREIGN KEY(commit_hash) REFERENCES commits(commit_hash),
+                  FOREIGN KEY(parent_hash) REFERENCES commits(commit_hash)
+              );
+              """;
 
       String branchesTable =
           """
               CREATE TABLE IF NOT EXISTS branches (
-                  branch_name TEXT PRIMARY KEY,
+                  branch_name TEXT,
+                  repo_name TEXT,
                   is_active INTEGER,
                   creation_date TEXT,
-                  merge_date TEXT
+                  merge_date TEXT,
+                  PRIMARY KEY (branch_name, repo_name)
               );
               """;
 
       String tagsTable =
           """
-                        CREATE TABLE IF NOT EXISTS tags (
-                            tag_name TEXT PRIMARY KEY,
-                            tag_commit TEXT,
-                            tag_message TEXT,
-                            FOREIGN KEY(tag_commit) REFERENCES commits(commit_id)
-                          );
+              CREATE TABLE IF NOT EXISTS tags (
+                  tag_name TEXT,
+                  repo_name TEXT,
+                  tag_commit TEXT,
+                  tag_message TEXT,
+                  PRIMARY KEY (tag_name, repo_name),
+                  FOREIGN KEY(tag_commit, repo_name) REFERENCES commits(commit_hash, repo_name)
+                );
               """;
 
       List<String> indexes =
           List.of(
               "CREATE INDEX idx_commits_author ON commits(author);",
+              "CREATE INDEX idx_commits_author_repo ON commits(author, repo_name);",
               "CREATE INDEX idx_commits_date ON commits(date);",
+              "CREATE INDEX idx_commits_date_repo ON commits(date, repo_name);",
               "CREATE INDEX idx_commits_author_date ON commits(author, date);",
+              "CREATE INDEX idx_commits_author_date_repo ON commits(author, date, repo_name);",
               "CREATE INDEX idx_commit_date_merge on commits(date, is_merge);",
+              "CREATE INDEX idx_commit_date_merge_repo on commits(date, is_merge, repo_name);",
               "CREATE INDEX idx_commit_merge_date on commits(is_merge, date);",
-              "CREATE INDEX idx_commit_date_id on commits(date, commit_id);",
+              "CREATE INDEX idx_commit_merge_date_repo on commits(is_merge, date, repo_name);",
+              "CREATE INDEX idx_commit_date_id on commits(date, commit_hash);",
+              "CREATE INDEX idx_commit_date_id_repo on commits(date, commit_hash, repo_name);",
               "CREATE INDEX idx_file_changes_file_path ON file_changes(file_path);",
+              "CREATE INDEX idx_file_changes_file_path_repo ON file_changes(file_path,repo_name);",
               "CREATE INDEX idx_file_changes_commit_file ON file_changes(commit_hash, file_path);",
+              "CREATE INDEX idx_file_changes_commit_file_repo ON file_changes(commit_hash, file_path, repo_name);",
               "CREATE INDEX idx_file_changes_group_order ON file_changes(file_path, commit_hash);",
+              "CREATE INDEX idx_file_changes_group_order_repo ON file_changes(file_path, commit_hash, repo_name);",
               "CREATE INDEX idx_file_changes_commit_hash ON file_changes(commit_hash);",
+              "CREATE INDEX idx_file_changes_commit_hash_repo ON file_changes(commit_hash, repo_name);",
               "CREATE INDEX idx_is_test_file ON file_changes(is_test_file);",
+              "CREATE INDEX idx_is_test_file_repo ON file_changes(is_test_file, repo_name);",
               "CREATE INDEX idx_is_build_file ON file_changes(is_build_file);",
+              "CREATE INDEX idx_is_build_file_repo ON file_changes(is_build_file, repo_name);",
               "CREATE INDEX idx_is_dot_file ON file_changes(is_dot_file);",
+              "CREATE INDEX idx_is_dot_file_repo ON file_changes(is_dot_file, repo_name);",
               "CREATE INDEX idx_tag_name on tags(tag_name);",
+              "CREATE INDEX idx_tag_name_name on tags(tag_name, repo_name);",
               "CREATE INDEX idx_is_documentation_file ON file_changes(is_documentation_file);",
+              "CREATE INDEX idx_is_documentation_file_repo ON file_changes(is_documentation_file, repo_name);",
               "CREATE INDEX idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file);",
+              "CREATE INDEX idx_file_changes_performance_repo ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file, repo_name);",
               "CREATE INDEX idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions);",
-              "CREATE INDEX idx_commit_parents_commit_id ON commit_parents(commit_id);",
-              "CREATE INDEX idx_commit_parents_parent_id ON commit_parents(parent_id);");
+              "CREATE INDEX idx_file_changes_hash_add_del_repo ON file_changes(commit_hash, additions, deletions, repo_name);",
+              "CREATE INDEX idx_commit_parents_commit_hash ON commit_parents(commit_hash);",
+              "CREATE INDEX idx_commit_parents_commit_hash_repo ON commit_parents(commit_hash, repo_name);",
+              "CREATE INDEX idx_commit_parents_parent_hash ON commit_parents(parent_hash);",
+              "CREATE INDEX idx_commit_parents_parent_hash_repo ON commit_parents(parent_hash, repo_name);");
 
       try (Statement stmt = conn.createStatement()) {
         stmt.execute(createCommitsTable);
@@ -163,7 +191,7 @@ public class SolDb {
   }
 
   public static void insertTag(Tag tag) {
-    String insertTagSQL = "INSERT INTO tags (tag_name, tag_commit, tag_message) VALUES (?, ?, ?)";
+    String insertTagSQL = "INSERT INTO tags (tag_name, tag_commit, tag_message, repo_name) VALUES (?, ?, ?, ?)";
 
     try (Connection conn = DriverManager.getConnection(DB_URL);
         PreparedStatement tagStmt = conn.prepareStatement(insertTagSQL)) {
@@ -171,6 +199,7 @@ public class SolDb {
       tagStmt.setString(1, tag.name());
       tagStmt.setString(2, tag.commitId());
       tagStmt.setString(3, tag.message());
+      tagStmt.setString(4, tag.repoName());
       tagStmt.executeUpdate();
     } catch (SQLException e) {
       System.err.println("There was an issue inserting tags: " + e.getMessage());
@@ -179,7 +208,7 @@ public class SolDb {
 
   public static void insertBranch(Branch branch) {
     String insertBranchSQL =
-        "INSERT INTO branches (branch_name, is_active, creation_date, merge_date) VALUES (?, ?, ?, ?)";
+        "INSERT INTO branches (branch_name, is_active, creation_date, merge_date, repo_name) VALUES (?, ?, ?, ?, ?)";
 
     try (Connection conn = DriverManager.getConnection(DB_URL);
         PreparedStatement branchStmt = conn.prepareStatement(insertBranchSQL)) {
@@ -188,6 +217,7 @@ public class SolDb {
       branchStmt.setInt(2, branch.active());
       branchStmt.setString(3, convertDateToUtc(branch.creationDate()));
       branchStmt.setString(4, convertDateToUtc(branch.mergeDate()));
+      branchStmt.setString(5, branch.repoName());
       branchStmt.executeUpdate();
     } catch (SQLException e) {
       System.err.println("There was an issue inserting branches: " + e.getMessage());
@@ -201,15 +231,15 @@ public class SolDb {
    */
   public static void insertCommits(List<CommitRecord> commits) {
     String insertCommitSQL =
-        "INSERT INTO commits (commit_id, author, date, timezone, is_merge, total_additions, "
+        "INSERT INTO commits (commit_hash, author, date, timezone, is_merge, total_additions, "
             + "total_deletions, message, total_additions_test, total_deletions_test, "
             + "total_additions_build, total_deletions_build, "
-            + "total_additions_dot, total_deletions_dot) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            + "total_additions_dot, total_deletions_dot, repo_name) "
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     String insertFileChangeSQL =
-        "INSERT INTO file_changes (commit_hash, author, change_type, file_path, additions, deletions, is_test_file, is_build_file, is_dot_file, is_documentation_file) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        "INSERT INTO file_changes (commit_hash, author, change_type, file_path, additions, deletions, is_test_file, is_build_file, is_dot_file, is_documentation_file, repo_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     String insertIntoCommitParentsSQL =
-        "INSERT INTO commit_parents (commit_id, parent_id) VALUES (?, ?)";
+        "INSERT INTO commit_parents (commit_hash, parent_hash, repo_name) VALUES (?, ?, ?)";
 
     final int BATCH_SIZE = 1000;
     int batchCount = 0;
@@ -252,6 +282,7 @@ public class SolDb {
           commitStmt.setInt(12, totalDelDotFiles);
           commitStmt.setInt(13, totalAddBuildFiles);
           commitStmt.setInt(14, totalDelBuildFiles);
+          commitStmt.setString(15, commit.repoName());
 
           commitStmt.addBatch();
 
@@ -267,6 +298,7 @@ public class SolDb {
             fileChangeStmt.setInt(8, fileChange.isBuildFile() ? 1 : 0);
             fileChangeStmt.setInt(9, fileChange.isDotFile() ? 1 : 0);
             fileChangeStmt.setInt(10, fileChange.isDocumentationFile() ? 1 : 0);
+            fileChangeStmt.setString(11, commit.repoName());
             fileChangeStmt.addBatch();
           }
 
@@ -274,6 +306,7 @@ public class SolDb {
           for (String parent : commit.parents()) {
             parentStmt.setString(1, commit.commitHash());
             parentStmt.setString(2, parent);
+            parentStmt.setString(3, commit.repoName());
             parentStmt.addBatch();
           }
 

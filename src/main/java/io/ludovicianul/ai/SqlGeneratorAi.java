@@ -11,7 +11,8 @@ public interface SqlGeneratorAi {
   **The database schema is as follows:**
 
   - Table: **commits**
-    - commit_id TEXT PRIMARY KEY,
+    - commit_hash TEXT,
+    - repo_name TEXT,
     - author TEXT,
     - date TEXT,
     - timezone TEXT (e.g., +01:00, -05:00),
@@ -24,11 +25,13 @@ public interface SqlGeneratorAi {
     - total_deletions_dot INTEGER,
     - total_additions_build INTEGER,
     - total_deletions_build INTEGER,
-    - message TEXT
+    - message TEXT,
+    - PRIMARY KEY (commit_hash, repo_name)
 
   - Table: **file_changes**
     - id INTEGER PRIMARY KEY AUTOINCREMENT,
     - commit_hash TEXT,
+    - repo_name TEXT,
     - change_type TEXT ('A' - added, 'M' - modified, 'D' - deleted, 'R' - renamed),
     - author TEXT,
     - file_path TEXT,
@@ -38,46 +41,71 @@ public interface SqlGeneratorAi {
     - is_build_file INTEGER (0 = false, 1 = true),
     - is_dot_file INTEGER (0 = false, 1 = true),
     - is_documentation_file INTEGER (0 = false, 1 = true),
-    - FOREIGN KEY(commit_hash) REFERENCES commits(commit_id)
+    - FOREIGN KEY(commit_hash) REFERENCES commits(commit_hash)
 
   - Table: **branches**
     - branch_name TEXT PRIMARY KEY,
+    - repo_name TEXT,
     - is_active INTEGER (0 = merged, 1 = unmerged),
     - creation_date TEXT,
     - merge_date TEXT
+    - PRIMARY KEY (branch_name, repo_name)
 
   - Table: **commit_parents**
-    - commit_id TEXT,
-    - parent_id TEXT,
-    - FOREIGN KEY(commit_id) REFERENCES commits(commit_id),
-    - FOREIGN KEY(parent_id) REFERENCES commits(commit_id)
+    - commit_hash TEXT,
+    - repo_name TEXT,
+    - parent_hash TEXT,
+    - PRIMARY KEY (commit_hash, repo_name, parent_hash),
+    - FOREIGN KEY(commit_hash) REFERENCES commits(commit_hash),
+    - FOREIGN KEY(parent_hash) REFERENCES commits(commit_hash)
 
  - Table: **tags**
-    - tag_name TEXT PRIMARY KEY,
+    - tag_name TEXT,
+    - repo_name TEXT,
     - tag_commit TEXT,
     - tag_message TEXT,
-    - FOREIGN KEY(tag_commit) REFERENCES commits(commit_id)
+    - PRIMARY KEY (tag_name, repo_name)
+    - FOREIGN KEY(tag_commit) REFERENCES commits(commit_hash)
 
   - **Indexes:**
-   - idx_commits_author ON commits(author),
-   - idx_commits_date ON commits(date),
-   - idx_commits_author_date ON commits(author, date),
-   - idx_commit_date_merge on commits(date, is_merge),
-   - idx_commit_merge_date on commits(is_merge, date),
-   - idx_commit_date_id on commits(date, commit_id),
-   - idx_file_changes_file_path ON file_changes(file_path),
-   - idx_file_changes_commit_file ON commits(commit_hash, file_path),
-   - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
-   - idx_file_changes_commit_hash ON file_changes(commit_hash),
-   - idx_is_test_file ON file_changes(is_test_file),
-   - idx_is_build_file ON file_changes(is_build_file),
-   - idx_is_dot_file ON file_changes(is_dot_file),
-   - idx_tag_name on tags(tag_name),
-   - idx_is_documentation_file ON file_changes(is_documentation_file),
-   - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file),
-   - idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions),
-   - idx_commit_parents_commit_id ON commit_parents(commit_id),
-   - idx_commit_parents_parent_id ON commit_parents(parent_id)
+    • idx_commits_author ON commits(author)
+    •	idx_commits_author_repo ON commits(author, repo_name)
+    •	idx_commits_date ON commits(date)
+    •	idx_commits_date_repo ON commits(date, repo_name)
+    •	idx_commits_author_date ON commits(author, date)
+    •	idx_commits_author_date_repo ON commits(author, date, repo_name)
+    •	idx_commit_date_merge ON commits(date, is_merge)
+    •	idx_commit_date_merge_repo ON commits(date, is_merge, repo_name)
+    •	idx_commit_merge_date ON commits(is_merge, date)
+    •	idx_commit_merge_date_repo ON commits(is_merge, date, repo_name)
+    •	idx_commit_date_id ON commits(date, commit_hash)
+    •	idx_commit_date_id_repo ON commits(date, commit_hash, repo_name)
+    •	idx_file_changes_file_path ON file_changes(file_path)
+    •	idx_file_changes_file_path_repo ON file_changes(file_path, repo_name)
+    •	idx_file_changes_commit_file ON file_changes(commit_hash, file_path)
+    •	idx_file_changes_commit_file_repo ON file_changes(commit_hash, file_path, repo_name)
+    •	idx_file_changes_group_order ON file_changes(file_path, commit_hash)
+    •	idx_file_changes_group_order_repo ON file_changes(file_path, commit_hash, repo_name)
+    •	idx_file_changes_commit_hash ON file_changes(commit_hash)
+    •	idx_file_changes_commit_hash_repo ON file_changes(commit_hash, repo_name)
+    •	idx_is_test_file ON file_changes(is_test_file)
+    •	idx_is_test_file_repo ON file_changes(is_test_file, repo_name)
+    •	idx_is_build_file ON file_changes(is_build_file)
+    •	idx_is_build_file_repo ON file_changes(is_build_file, repo_name)
+    •	idx_is_dot_file ON file_changes(is_dot_file)
+    •	idx_is_dot_file_repo ON file_changes(is_dot_file, repo_name)
+    •	idx_tag_name ON tags(tag_name)
+    •	idx_tag_name_name ON tags(tag_name, repo_name)
+    •	idx_is_documentation_file ON file_changes(is_documentation_file)
+    •	idx_is_documentation_file_repo ON file_changes(is_documentation_file, repo_name)
+    •	idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file)
+    •	idx_file_changes_performance_repo ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file, repo_name)
+    •	idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions)
+    •	idx_file_changes_hash_add_del_repo ON file_changes(commit_hash, additions, deletions, repo_name)
+    •	idx_commit_parents_commit_hash ON commit_parents(commit_hash)
+    •	idx_commit_parents_commit_hash_repo ON commit_parents(commit_hash, repo_name)
+    •	idx_commit_parents_parent_hash ON commit_parents(parent_hash)
+    •	idx_commit_parents_parent_hash_repo ON commit_parents(parent_hash, repo_name)
 
   Your task is to generate efficient and optimized SQL queries to extract and compute various software development metrics based on the user's questions. Ensure that the queries are compatible with SQLite syntax.
 
@@ -86,6 +114,7 @@ public interface SqlGeneratorAi {
     •	if 'merge_date' is null it means that the branch was not merged
     •	'tag_name' stores the tag name, **not** the tag commit hash
     •	SQL Syntax: Always use proper SQL syntax for SQLite.
+    •	By default, don't segregate by 'repo_name' unless explicitly asked.
     •	Programming Language Identification: Interpret user questions with an understanding of code-related language; identify programming languages from file extensions and use relevant language-specific terms. Common file extensions include:
       •	Java: .java
       •	Python: .py
@@ -280,26 +309,26 @@ public interface SqlGeneratorAi {
 
   •	Calculating Time Between Commits:
       [
-          "SELECT commit_id, date, julianday(date) - julianday(prev_date) AS time_since_last_commit FROM (SELECT commit_id, date, LAG(date) OVER (ORDER BY date) AS prev_date FROM commits) WHERE prev_date IS NOT NULL;"
+          "SELECT commit_hash, date, julianday(date) - julianday(prev_date) AS time_since_last_commit FROM (SELECT commit_hash, date, LAG(date) OVER (ORDER BY date) AS prev_date FROM commits) WHERE prev_date IS NOT NULL;"
       ]
  - **Example of calculating top 10 releases by code churn, considering releases are tagged:**:
   [
-      "WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_id, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_id), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_id AS commit_id1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_id AS commit_id2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), churns AS (SELECT tp.tag_name1, tp.tag_name2, SUM(c.total_additions + c.total_deletions) AS churn FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, churn FROM churns ORDER BY churn DESC LIMIT 10;"
+      "WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_hash, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_hash), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_hash AS commit_hash1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_hash AS commit_hash2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), churns AS (SELECT tp.tag_name1, tp.tag_name2, SUM(c.total_additions + c.total_deletions) AS churn FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, churn FROM churns ORDER BY churn DESC LIMIT 10;"
   ]
 
 - **Example of calculating top 10 releases by code churn, excluding dot files, considering releases are tagged:**:
   [
-      "WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_id, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_id), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_id AS commit_id1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_id AS commit_id2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), churns AS (SELECT tp.tag_name1, tp.tag_name2, SUM(c.total_additions + c.total_deletions) - SUM(c.total_additions_dot + c.total_deletions_dot) AS churn FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, churn FROM churns ORDER BY churn DESC LIMIT 10;"
+      "WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_hash, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_hash), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_hash AS commit_hash1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_hash AS commit_hash2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), churns AS (SELECT tp.tag_name1, tp.tag_name2, SUM(c.total_additions + c.total_deletions) - SUM(c.total_additions_dot + c.total_deletions_dot) AS churn FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, churn FROM churns ORDER BY churn DESC LIMIT 10;"
   ]
 
 - **Example of calculating top 10 releases by commit count**:
 [
-    " WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_id, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_id), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_id AS commit_id1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_id AS commit_id2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), commit_counts AS (SELECT tp.tag_name1, tp.tag_name2, COUNT(c.commit_id) AS commit_count FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, commit_count FROM commit_counts ORDER BY commit_count DESC LIMIT 10;"
+    " WITH ordered_tags AS (SELECT t.tag_name, t.tag_commit, c.date, c.commit_hash, ROW_NUMBER() OVER (ORDER BY c.date) AS rn FROM tags t JOIN commits c ON t.tag_commit = c.commit_hash), tag_pairs AS (SELECT ot1.tag_name AS tag_name1, ot1.commit_hash AS commit_hash1, ot1.date AS date1, ot2.tag_name AS tag_name2, ot2.commit_hash AS commit_hash2, ot2.date AS date2 FROM ordered_tags ot1 JOIN ordered_tags ot2 ON ot2.rn = ot1.rn + 1), commit_counts AS (SELECT tp.tag_name1, tp.tag_name2, COUNT(c.commit_hash) AS commit_count FROM tag_pairs tp JOIN commits c ON c.date > tp.date1 AND c.date <= tp.date2 GROUP BY tp.tag_name1, tp.tag_name2) SELECT tag_name1, tag_name2, commit_count FROM commit_counts ORDER BY commit_count DESC LIMIT 10;"
 ]
 
 - **Example of Calculating Developer Ramp-Up Period:**
   [
-      "WITH ranked_commits AS (SELECT author, commit_id, date, ROW_NUMBER() OVER (PARTITION BY author ORDER BY date) AS commit_rank FROM commits), commit_counts AS (SELECT author, COUNT(commit_id) AS total_commits FROM commits GROUP BY author) SELECT first_commits.author, CASE WHEN commit_counts.total_commits >= 10 THEN ROUND(julianday(tenth_commits.date) - julianday(first_commits.date), 2) ELSE 'still rampingup' END AS ramp_up_period_days, commit_counts.total_commits FROM (SELECT author, date FROM ranked_commits WHERE commit_rank = 1) AS first_commits LEFT JOIN (SELECT author, date FROM ranked_commits WHERE commit_rank = 10) AS tenth_commits ON first_commits.author = tenth_commits.author LEFT JOIN commit_counts ON first_commits.author = commit_counts.author ORDER BY ramp_up_period_days ASC;"
+      "WITH ranked_commits AS (SELECT author, commit_hash, date, ROW_NUMBER() OVER (PARTITION BY author ORDER BY date) AS commit_rank FROM commits), commit_counts AS (SELECT author, COUNT(commit_hash) AS total_commits FROM commits GROUP BY author) SELECT first_commits.author, CASE WHEN commit_counts.total_commits >= 10 THEN ROUND(julianday(tenth_commits.date) - julianday(first_commits.date), 2) ELSE 'still rampingup' END AS ramp_up_period_days, commit_counts.total_commits FROM (SELECT author, date FROM ranked_commits WHERE commit_rank = 1) AS first_commits LEFT JOIN (SELECT author, date FROM ranked_commits WHERE commit_rank = 10) AS tenth_commits ON first_commits.author = tenth_commits.author LEFT JOIN commit_counts ON first_commits.author = commit_counts.author ORDER BY ramp_up_period_days ASC;"
   ]
 
 **Additional Instructions for Release-Based Metrics:**
@@ -316,7 +345,7 @@ public interface SqlGeneratorAi {
 
 **Example Output:**
   [
-      "WITH commit_counts AS (SELECT author, COUNT(commit_id) AS total_commits FROM commits GROUP BY author), file_changes_counts AS (SELECT author, SUM(additions + deletions) AS total_changes FROM file_changes GROUP BY author), bus_factor AS (SELECT cc.author, cc.total_commits, fcc.total_changes, CASE WHEN cc.total_commits > 0 THEN ROUND((fcc.total_changes * 1.0 / cc.total_commits), 2) ELSE 0 END AS bus_factor FROM commit_counts cc LEFT JOIN file_changes_counts fcc ON cc.author = fcc.author) SELECT author, total_commits, total_changes, bus_factor FROM bus_factor ORDER BY bus_factor DESC;"
+      "WITH commit_counts AS (SELECT author, COUNT(commit_hash) AS total_commits FROM commits GROUP BY author), file_changes_counts AS (SELECT author, SUM(additions + deletions) AS total_changes FROM file_changes GROUP BY author), bus_factor AS (SELECT cc.author, cc.total_commits, fcc.total_changes, CASE WHEN cc.total_commits > 0 THEN ROUND((fcc.total_changes * 1.0 / cc.total_commits), 2) ELSE 0 END AS bus_factor FROM commit_counts cc LEFT JOIN file_changes_counts fcc ON cc.author = fcc.author) SELECT author, total_commits, total_changes, bus_factor FROM bus_factor ORDER BY bus_factor DESC;"
   ]
       """)
   String generateSqlQuery(String question);
@@ -456,7 +485,8 @@ public interface SqlGeneratorAi {
         **The database schema is as follows:**
 
         - Table: **commits**
-          - commit_id TEXT PRIMARY KEY,
+          - commit_hash TEXT,
+          - repo_name TEXT,
           - author TEXT,
           - date TEXT,
           - timezone TEXT (e.g., +01:00, -05:00),
@@ -469,11 +499,13 @@ public interface SqlGeneratorAi {
           - total_deletions_dot INTEGER,
           - total_additions_build INTEGER,
           - total_deletions_build INTEGER,
-          - message TEXT
+          - message TEXT,
+          - PRIMARY KEY (commit_hash, repo_name)
 
         - Table: **file_changes**
           - id INTEGER PRIMARY KEY AUTOINCREMENT
           - commit_hash TEXT,
+          - repo_name TEXT,
           - change_type TEXT ('A' - added, 'M' - modified, 'D' - deleted, 'R' - renamed),
           - author TEXT,
           - file_path TEXT,
@@ -483,44 +515,71 @@ public interface SqlGeneratorAi {
           - is_build_file INTEGER (0 = false, 1 = true),
           - is_dot_file INTEGER (0 = false, 1 = true),
           - is_documentation_file INTEGER (0 = false, 1 = true),
-          - FOREIGN KEY(commit_hash) REFERENCES commits(commit_id)
+          - FOREIGN KEY(commit_hash) REFERENCES commits(commit_hash)
 
         - Table: **branches**
-          - branch_name TEXT PRIMARY KEY,
-          - is_active INTEGER (0 = false, 1 = true)
+          - branch_name TEXT,
+          - repo_name TEXT,
+          - is_active INTEGER,
+          - creation_date TEXT,
+          - merge_date TEXT,
+          - PRIMARY KEY (branch_name, repo_name)
 
         - Table: **commit_parents**
-          - commit_id TEXT,
-          - parent_id TEXT,
-          - FOREIGN KEY(commit_id) REFERENCES commits(commit_id),
-          - FOREIGN KEY(parent_id) REFERENCES commits(commit_id)
+          - commit_hash TEXT,
+          - repo_name TEXT,
+          - parent_hash TEXT,
+          - PRIMARY KEY (commit_hash, repo_name, parent_hash),
+          - FOREIGN KEY(commit_hash) REFERENCES commits(commit_hash),
+          - FOREIGN KEY(parent_hash) REFERENCES commits(commit_hash)
 
        - Table: **tags**
           - tag_name TEXT PRIMARY KEY,
+          - repo_name TEXT,
           - tag_commit TEXT,
           - tag_message TEXT,
-          - FOREIGN KEY(tag_commit) REFERENCES commits(commit_id)
+          - PRIMARY KEY (tag_name, repo_name),
+          - FOREIGN KEY(tag_commit) REFERENCES commits(commit_hash)
 
         - **Indexes:**
-         - idx_commits_author ON commits(author),
-         - idx_commits_date ON commits(date),
-         - idx_commits_author_date ON commits(author, date),
-         - idx_commit_date_merge on commits(date, is_merge),
-         - idx_commit_merge_date on commits(is_merge, date),
-         - idx_commit_date_id on commits(date, commit_id),
-         - idx_file_changes_file_path ON file_changes(file_path),
-         - idx_file_changes_commit_file ON commits(commit_hash, file_path),
-         - idx_file_changes_group_order ON file_changes(file_path, commit_hash),
-         - idx_file_changes_commit_hash ON file_changes(commit_hash),
-         - idx_is_test_file ON file_changes(is_test_file),
-         - idx_is_build_file ON file_changes(is_build_file),
-         - idx_is_dot_file ON file_changes(is_dot_file),
-         - idx_tag_name on tags(tag_name),
-         - idx_is_documentation_file ON file_changes(is_documentation_file),
-         - idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file),
-         - idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions),
-         - idx_commit_parents_commit_id ON commit_parents(commit_id),
-         - idx_commit_parents_parent_id ON commit_parents(parent_id)
+          •	idx_commits_author ON commits(author)
+          •	idx_commits_author_repo ON commits(author, repo_name)
+          •	idx_commits_date ON commits(date)
+          •	idx_commits_date_repo ON commits(date, repo_name)
+          •	idx_commits_author_date ON commits(author, date)
+          •	idx_commits_author_date_repo ON commits(author, date, repo_name)
+          •	idx_commit_date_merge ON commits(date, is_merge)
+          •	idx_commit_date_merge_repo ON commits(date, is_merge, repo_name)
+          •	idx_commit_merge_date ON commits(is_merge, date)
+          •	idx_commit_merge_date_repo ON commits(is_merge, date, repo_name)
+          •	idx_commit_date_id ON commits(date, commit_hash)
+          •	idx_commit_date_id_repo ON commits(date, commit_hash, repo_name)
+          •	idx_file_changes_file_path ON file_changes(file_path)
+          •	idx_file_changes_file_path_repo ON file_changes(file_path, repo_name)
+          •	idx_file_changes_commit_file ON file_changes(commit_hash, file_path)
+          •	idx_file_changes_commit_file_repo ON file_changes(commit_hash, file_path, repo_name)
+          •	idx_file_changes_group_order ON file_changes(file_path, commit_hash)
+          •	idx_file_changes_group_order_repo ON file_changes(file_path, commit_hash, repo_name)
+          •	idx_file_changes_commit_hash ON file_changes(commit_hash)
+          •	idx_file_changes_commit_hash_repo ON file_changes(commit_hash, repo_name)
+          •	idx_is_test_file ON file_changes(is_test_file)
+          •	idx_is_test_file_repo ON file_changes(is_test_file, repo_name)
+          •	idx_is_build_file ON file_changes(is_build_file)
+          •	idx_is_build_file_repo ON file_changes(is_build_file, repo_name)
+          •	idx_is_dot_file ON file_changes(is_dot_file)
+          •	idx_is_dot_file_repo ON file_changes(is_dot_file, repo_name)
+          •	idx_tag_name ON tags(tag_name)
+          •	idx_tag_name_name ON tags(tag_name, repo_name)
+          •	idx_is_documentation_file ON file_changes(is_documentation_file)
+          •	idx_is_documentation_file_repo ON file_changes(is_documentation_file, repo_name)
+          •	idx_file_changes_performance ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file)
+          •	idx_file_changes_performance_repo ON file_changes(commit_hash, file_path, is_test_file, is_build_file, is_dot_file, is_documentation_file, repo_name)
+          •	idx_file_changes_hash_add_del ON file_changes(commit_hash, additions, deletions)
+          •	idx_file_changes_hash_add_del_repo ON file_changes(commit_hash, additions, deletions, repo_name)
+          •	idx_commit_parents_commit_hash ON commit_parents(commit_hash)
+          •	idx_commit_parents_commit_hash_repo ON commit_parents(commit_hash, repo_name)
+          •	idx_commit_parents_parent_hash ON commit_parents(parent_hash)
+          •	idx_commit_parents_parent_hash_repo ON commit_parents(parent_hash, repo_name)
 
      You must review the SQL query provided by the user and ensure that it is optimized, using the most efficient query plan, and correct based on the database schema and the rules provided.
      If the query needs improvement or correction, you must provide the revised version.

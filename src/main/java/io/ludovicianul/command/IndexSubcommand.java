@@ -8,10 +8,13 @@ import io.ludovicianul.model.CommitRecord;
 import io.ludovicianul.model.FileChange;
 import io.ludovicianul.model.Tag;
 import io.ludovicianul.service.FileTypeService;
+import java.io.File;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -35,9 +38,26 @@ public class IndexSubcommand implements Runnable {
   @Override
   public void run() {
     initializeDatabase();
-    parseCommits();
-    parseBranches();
-    parseTags();
+    List<String> directories =
+        getDirectories().stream().filter(directory -> !directory.equals(".sol")).toList();
+    for (String directory : directories) {
+      parseCommits(directory);
+      parseBranches(directory);
+      parseTags(directory);
+    }
+  }
+
+  private List<String> getDirectories() {
+    if (isGitDirectory()) {
+      return List.of(Path.of(".").toFile().getName());
+    }
+    return Arrays.stream(Objects.requireNonNull(Path.of(".").toFile().listFiles(File::isDirectory)))
+        .map(File::getName)
+        .collect(Collectors.toList());
+  }
+
+  private boolean isGitDirectory() {
+    return new File(".git").exists();
   }
 
   private void initializeDatabase() {
@@ -45,18 +65,20 @@ public class IndexSubcommand implements Runnable {
     Logger.print("Database initialized");
   }
 
-  private void parseBranches() {
-    branchAndCreationDates = getBranchAndCreationDates();
-    parseBranches("merged");
-    parseBranches("no-merged");
+  private void parseBranches(String directory) {
+    branchAndCreationDates = getBranchAndCreationDates(directory);
+    parseBranches(directory, "merged");
+    parseBranches(directory, "no-merged");
   }
 
-  private Map<String, String> getBranchAndCreationDates() {
+  private Map<String, String> getBranchAndCreationDates(String directory) {
     Logger.print("Getting branch creation dates...");
     return ProcessRunner.INSTANCE
         .getMultiLineProcessOut(
             timeout,
-            "git for-each-ref --format='%(refname:short),%(creatordate:iso-strict)' refs/heads/ refs/remotes/")
+            "cd "
+                + directory
+                + " && git for-each-ref --format='%(refname:short),%(creatordate:iso-strict)' refs/heads/ refs/remotes/")
         .stream()
         .map(String::trim)
         .map(branch -> branch.replace("origin/", ""))
@@ -70,13 +92,15 @@ public class IndexSubcommand implements Runnable {
                 (existing, replacement) -> existing));
   }
 
-  private void parseTags() {
+  private void parseTags(String directory) {
     Logger.print("Collecting tags...");
 
     List<String> tags =
         ProcessRunner.INSTANCE.getMultiLineProcessOut(
             timeout,
-            "git for-each-ref --format='%(refname:short),%(objectname),%(object),%(creatordate:iso-strict),%(contents)' refs/tags");
+            "cd "
+                + directory
+                + " && git for-each-ref --format='%(refname:short),%(objectname),%(object),%(creatordate:iso-strict),%(contents)' refs/tags");
 
     tags.stream()
         .map(tag -> tag.split(","))
@@ -84,6 +108,7 @@ public class IndexSubcommand implements Runnable {
         .map(
             tag ->
                 new Tag(
+                    directory,
                     tag[0].trim(),
                     tag[2].trim().isEmpty() ? tag[1].trim() : tag[2].trim(),
                     tag[3].trim(),
@@ -93,13 +118,13 @@ public class IndexSubcommand implements Runnable {
     Logger.print("Finished collecting tags");
   }
 
-  private void parseBranches(String merged) {
+  private void parseBranches(String directory, String merged) {
     Logger.print("Collecting " + merged + " branches...");
     boolean isMerged = "merged".equals(merged);
 
     List<String> branches =
         ProcessRunner.INSTANCE.getMultiLineProcessOut(
-            timeout, "git branch -a --%s".formatted(merged));
+            timeout, "cd %s && git branch -a --%s".formatted(directory, merged));
     Set<String> mergedBranches =
         branches.stream()
             .map(String::trim)
@@ -107,18 +132,18 @@ public class IndexSubcommand implements Runnable {
             .map(Branch::removeRemoteOriginPrefix)
             .collect(Collectors.toSet());
     mergedBranches.stream()
-        .map(branch -> createBranch(branch, isMerged))
+        .map(branch -> createBranch(directory, branch, isMerged))
         .forEach(SolDb::insertBranch);
 
     Logger.print("Finished collecting " + merged + " branches");
   }
 
-  private Branch createBranch(String branch, boolean isMerged) {
+  private Branch createBranch(String directory, String branch, boolean isMerged) {
     String creationDate = branchAndCreationDates.get(branch);
     String mergeDate = isMerged ? getMergeDate(branch) : null;
     int active = isMerged ? 0 : 1;
 
-    return new Branch(branch, active, creationDate, mergeDate);
+    return new Branch(directory, branch, active, creationDate, mergeDate);
   }
 
   private String getMergeDate(String branch) {
@@ -129,21 +154,23 @@ public class IndexSubcommand implements Runnable {
         .orElse(null);
   }
 
-  private void parseCommits() {
+  private void parseCommits(String directory) {
     Logger.print("Collecting commits data...");
 
     List<String> gitLog =
         ProcessRunner.INSTANCE.getMultiLineProcessOut(
             timeout,
-            "git log --all --encoding=UTF-8 --numstat --raw --format=\"commit:%H%nauthor:%an%ndate:%cI %nparents:%P%nmessage:%n%s%n%b%nnumstat:\"");
+            "cd "
+                + directory
+                + " && git log --all --encoding=UTF-8 --numstat --raw --format=\"commit:%H%nauthor:%an%ndate:%cI %nparents:%P%nmessage:%n%s%n%b%nnumstat:\"");
 
-    commits = parseCommits(gitLog);
+    commits = parseCommits(directory, gitLog);
 
     SolDb.insertCommits(commits);
     Logger.print("Commits indexed successfully");
   }
 
-  public List<CommitRecord> parseCommits(List<String> lines) {
+  public List<CommitRecord> parseCommits(String directory, List<String> lines) {
     List<CommitRecord> commits = new ArrayList<>();
     String commitHash = null;
     String author = null;
@@ -157,6 +184,7 @@ public class IndexSubcommand implements Runnable {
         if (commitHash != null) {
           commits.add(
               new CommitRecord(
+                  directory,
                   commitHash,
                   author,
                   date,
@@ -185,6 +213,7 @@ public class IndexSubcommand implements Runnable {
         String filePath = parts[5];
         fileChanges.add(
             new FileChange(
+                directory,
                 changeType,
                 filePath,
                 0,
@@ -204,6 +233,7 @@ public class IndexSubcommand implements Runnable {
             fileChanges.set(
                 fileChanges.indexOf(fileChange),
                 new FileChange(
+                    directory,
                     fileChange.changeType(),
                     filePath,
                     additions,
@@ -222,7 +252,13 @@ public class IndexSubcommand implements Runnable {
     if (commitHash != null) {
       commits.add(
           new CommitRecord(
-              commitHash, author, date, message.toString().trim(), fileChanges, parents));
+              directory,
+              commitHash,
+              author,
+              date,
+              message.toString().trim(),
+              fileChanges,
+              parents));
     }
 
     return commits;

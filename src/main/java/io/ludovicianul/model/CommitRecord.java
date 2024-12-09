@@ -3,6 +3,7 @@ package io.ludovicianul.model;
 import java.util.List;
 
 public record CommitRecord(
+    String repoName,
     String commitHash,
     String author,
     String date,

@@ -1,6 +1,7 @@
 package io.ludovicianul.model;
 
 public record FileChange(
+    String repoName,
     String changeType,
     String filePath,
     int additions,
