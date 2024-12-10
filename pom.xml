@@ -11,12 +11,13 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
     <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-    <quarkus.platform.version>3.16.2</quarkus.platform.version>
+    <quarkus.platform.version>3.17.3</quarkus.platform.version>
     <skipITs>true</skipITs>
-    <surefire-plugin.version>3.5.0</surefire-plugin.version>
-    <jansi.version>2.4.0</jansi.version>
-    <sqlite-jdbc.version>3.47.0.0</sqlite-jdbc.version>
-    <langchain4j.version>0.21.0</langchain4j.version>
+    <surefire-plugin.version>3.5.2</surefire-plugin.version>
+    <jansi.version>2.4.1</jansi.version>
+    <sqlite-jdbc.version>3.47.1.0</sqlite-jdbc.version>
+    <langchain4j.version>0.22.0</langchain4j.version>
+    <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
   </properties>
   <dependencyManagement>
     <dependencies>
@@ -130,6 +131,26 @@
                 <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                 <maven.home>${maven.home}</maven.home>
               </systemPropertyVariables>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>${maven-enforcer-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>enforce-maven</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>[3.8.0,)</version>
+                </requireMavenVersion>
+              </rules>
             </configuration>
           </execution>
         </executions>
