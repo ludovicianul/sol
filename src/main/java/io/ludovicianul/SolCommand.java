@@ -2,6 +2,7 @@ package io.ludovicianul;
 
 import io.ludovicianul.command.CaseInsensitiveAiSystemConverter;
 import io.ludovicianul.command.IndexSubcommand;
+import io.ludovicianul.command.QueryCommand;
 import io.ludovicianul.log.Logger;
 import io.ludovicianul.model.QueryResult;
 import io.ludovicianul.service.SqlQueryService;
@@ -13,12 +14,12 @@ import picocli.CommandLine.Command;
 
 @Command(
     name = "sol",
-    description = "Statistics Over git Logs",
+    description = "Statistics Over git Logs using AI",
     header =
         "%n@|bold,fg(208) sol - Statistics Over git Logs.|@%nGet meaningful insights around code and people behaviour from git activity.%n",
     mixinStandardHelpOptions = true,
     version = "@|bold,fg(208) sol 1.0.4 - Statistics Over git Logs|@",
-    subcommands = {AutoComplete.GenerateCompletion.class})
+    subcommands = {AutoComplete.GenerateCompletion.class, QueryCommand.class})
 @TopCommand
 public class SolCommand implements Runnable {
 

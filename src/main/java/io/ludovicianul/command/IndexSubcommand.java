@@ -41,23 +41,28 @@ public class IndexSubcommand implements Runnable {
     List<String> directories =
         getDirectories().stream().filter(directory -> !directory.equals(".sol")).toList();
     for (String directory : directories) {
-      parseCommits(directory);
-      parseBranches(directory);
-      parseTags(directory);
+      if (isGitDirectory(directory)) {
+        parseCommits(directory);
+        parseBranches(directory);
+        parseTags(directory);
+      }
     }
   }
 
   private List<String> getDirectories() {
-    if (isGitDirectory()) {
-      return List.of(Path.of(".").toFile().getName());
+    String currentDirectory = ".";
+
+    if (isGitDirectory(currentDirectory)) {
+      return List.of(Path.of(currentDirectory).toFile().getName());
     }
-    return Arrays.stream(Objects.requireNonNull(Path.of(".").toFile().listFiles(File::isDirectory)))
+    return Arrays.stream(
+            Objects.requireNonNull(Path.of(currentDirectory).toFile().listFiles(File::isDirectory)))
         .map(File::getName)
         .collect(Collectors.toList());
   }
 
-  private boolean isGitDirectory() {
-    return new File(".git").exists();
+  private boolean isGitDirectory(String directory) {
+    return new File(directory, ".git").exists();
   }
 
   private void initializeDatabase() {

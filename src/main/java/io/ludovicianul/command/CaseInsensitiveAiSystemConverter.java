@@ -4,6 +4,9 @@ import io.ludovicianul.SolCommand;
 import java.util.Arrays;
 import picocli.CommandLine;
 
+/**
+ * Case insensitive converter for the AI system command line argument.
+ */
 public class CaseInsensitiveAiSystemConverter
     implements CommandLine.ITypeConverter<SolCommand.AiSystem> {
 

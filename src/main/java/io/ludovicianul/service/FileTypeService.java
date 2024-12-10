@@ -27,8 +27,8 @@ public class FileTypeService {
           );
   public static final List<String> TEST_FILES =
       List.of(
-          ".*Test\\.(java|kt|py|js|ts|cpp|c|rb|php|go|rs)$", // Common test file naming convention
-          ".*_test\\.(py|go|js|ts|c|cpp|rs)$", // Underscore test naming convention
+          ".*Test\\.(java|kt|py|js|ts|cpp|c|rb|php|go|rs|cs)$", // Common test file naming convention
+          ".*_test\\.(py|go|js|ts|c|cpp|rs|cs)$", // Underscore test naming convention
           ".*\\.spec\\.(js|ts|py)$", // Spec naming for JavaScript/TypeScript/Python
           ".*\\.(test|spec)\\.(js|ts|jsx|tsx)$", // Extended JS/TS test patterns
           ".*\\.feature$", // Cucumber feature files
@@ -38,8 +38,8 @@ public class FileTypeService {
           ".*\\.test\\.(rs|go)$", // Rust/Golang test files
 
           // Test files located in src/.../test directories
-          ".*/src/.*/test/.*/.*\\.(java|kt|py|js|ts|cpp|c|rb|php|go|rs)$",
-          ".*test/.*/.*\\.(java|kt|py|js|ts|cpp|c|rb|php|go|rs)$",
+          ".*/src/.*/test/.*/.*\\.(java|kt|py|js|ts|cpp|c|rb|php|go|rs|cs)$",
+          ".*test/.*/.*\\.(java|kt|py|js|ts|cpp|c|rb|php|go|rs|cs)$",
           ".*/test/.*/.*_test\\.(py|go|cpp|rs)$",
           ".*/src/.*/test/.*/.*\\.spec\\.(js|ts)$",
           ".*/src/.*/test/.*/.*\\.(test|spec)\\.(js|ts|jsx|tsx)$",
