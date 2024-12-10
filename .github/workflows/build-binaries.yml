@@ -146,7 +146,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ macos-latest, macos-13, ubuntu-latest ]
+        os: [ macos-latest, macos-13, windows-latest, ubuntu-latest ]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -198,3 +198,21 @@ jobs:
           asset_path: sol_${{ env.RUNNER_OS }}_${{ env.OS_ARCH}}_${{ github.event.inputs.releaseversion }}.tar.gz
           asset_name: sol_${{ env.RUNNER_OS }}_${{ env.OS_ARCH}}_${{ github.event.inputs.releaseversion }}.tar.gz
           asset_content_type: application/gzip
+      - name: Zip file for Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          copy target\sol-runner.exe sol.exe
+          Compress-Archive -Path sol.exe -Destination sol_windows_amd64_${{ github.event.inputs.releaseversion }}.zip
+
+      - name: Upload Zip for Windows
+        if: matrix.os == 'windows-latest'
+        id: upload-release-asset-windows
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_URL: ${{ needs.release.outputs.release_upload_url }}
+        with:
+          upload_url: ${{ env.RELEASE_URL }}
+          asset_path: sol_windows_amd64_${{ github.event.inputs.releaseversion }}.zip
+          asset_name: sol_windows_amd64_${{ github.event.inputs.releaseversion }}.zip
+          asset_content_type: application/zip
